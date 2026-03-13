@@ -9,4 +9,6 @@ add_executable(TablutBot
     src/main.cpp    
 )
 
-target_include_directories(TablutBot PRIVATE src/)
+target_include_directories(TablutBot PRIVATE src/ lib/json/include)
+
+add_subdirectory(lib/json)

@@ -1,4 +1,6 @@
 #include "Socket.h"
+#include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
@@ -46,4 +48,30 @@ Socket::Socket(const std::string &ip, const uint32_t port)
 }
 
 Socket::~Socket() { close(mSocket); }
+
+std::string Socket::Receive() const {
+    uint32_t string_size{0};
+    read(mSocket, &string_size, sizeof(uint32_t));
+    string_size = htonl(string_size);
+
+    std::string msg;
+    msg.resize(string_size);
+
+    if (read(mSocket, msg.data(), string_size) <= 0) {
+        return "";
+    }
+
+    return msg;
+}
+
+void Socket::Send(const std::string &msg) const {
+    uint32_t msg_length = ntohl(static_cast<uint32_t>(msg.size()));
+    write(mSocket, &msg_length, sizeof(msg_length));
+
+    size_t sent = write(mSocket, msg.data(), msg.size());
+    if (sent != msg.size()) {
+        std::cerr << "Failed to send to socket: expected " << msg.size()
+                  << ", sent " << sent << std::endl;
+    }
+}
 #endif

@@ -1,10 +1,5 @@
 #include "Tablut.h"
-#include <cstdint>
-#include <iostream>
-#include <optional>
-#include <ostream>
 #include <sstream>
-#include <vector>
 
 constexpr uint16_t sKingMask = 1 << 15;
 constexpr uint16_t sGuardMask = 1 << 14;

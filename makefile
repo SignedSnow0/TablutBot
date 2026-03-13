@@ -4,5 +4,7 @@ build: generate
 	cmake --build bin/
 lsp: generate
 	cp bin/compile_commands.json .
-run: build
-	./bin/TablutBot localhost 5800 60
+white: build
+	./bin/TablutBot WHITE 127.0.0.1 60
+black: build
+	./bin/TablutBot BLACK 127.0.0.1 60
