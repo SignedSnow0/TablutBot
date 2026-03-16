@@ -61,7 +61,7 @@ std::string Socket::Receive() const {
         return "";
     }
 
-    return msg;
+    return std::move(msg);
 }
 
 void Socket::Send(const std::string &msg) const {

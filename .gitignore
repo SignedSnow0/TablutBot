@@ -1,3 +1,4 @@
 .cache/
 bin/
+logs/
 compile_commands.json

@@ -1,14 +1,20 @@
 #include "Tablut.h"
+#include <cstdint>
+#include <iostream>
 #include <sstream>
+#include <string>
 
 constexpr uint16_t sKingMask = 1 << 15;
 constexpr uint16_t sGuardMask = 1 << 14;
 constexpr uint16_t sMercenaryMask = 1 << 13;
 
+constexpr uint16_t sBlackMask = sMercenaryMask;
+constexpr uint16_t sWhiteMask = sKingMask | sGuardMask;
+
 constexpr uint16_t sCampMask = 1 << 12 | 1 << 11 | 1 << 10 | 1 << 9;
 
-constexpr uint16_t sRowMask = 1 << 3 | 1 << 2 | 1 << 1 | 1 << 0;
-constexpr uint16_t sColumnMask = 1 << 7 | 1 << 6 | 1 << 5 | 1 << 4;
+constexpr uint16_t sRowMask = 1 << 7 | 1 << 6 | 1 << 5 | 1 << 4;
+constexpr uint16_t sColumnMask = 1 << 3 | 1 << 2 | 1 << 1 | 1 << 0;
 constexpr uint16_t sPositionMask = sRowMask | sColumnMask;
 
 bool positionInTopCamp(uint8_t row, uint8_t column) {
@@ -90,8 +96,8 @@ bool isInSameCamp(const Piece &piece, uint8_t newRow, uint8_t newColumn) {
 
 Piece::Piece(uint8_t row, uint8_t column, Type type, Camp camp) {
     mInternal = 0;
-    mInternal |= row;
-    mInternal |= column << 4;
+    mInternal |= column;
+    mInternal |= row << 4;
 
     if (type == Type::King) {
         mInternal |= sKingMask;
@@ -112,44 +118,82 @@ Piece::Piece(uint8_t row, uint8_t column, Type type, Camp camp) {
     }
 }
 
-uint8_t Piece::Row() const { return mInternal & sRowMask; }
-uint8_t Piece::Column() const { return (mInternal & sColumnMask) >> 4; }
+bool Piece::operator<(const Piece &r) const {
+    return (mInternal & sPositionMask) < (r.mInternal & sPositionMask);
+}
+
+uint8_t Piece::Row() const { return (mInternal & sRowMask) >> 4; }
+uint8_t Piece::Column() const { return mInternal & sColumnMask; }
+Position Piece::Position() const { return ::Position{Row(), Column()}; }
 
 bool Piece::IsKing() const { return mInternal & sKingMask; }
 bool Piece::IsGuard() const { return mInternal & sGuardMask; }
 bool Piece::IsMercenary() const { return mInternal & sMercenaryMask; }
 bool Piece::IsInCamp() const { return mInternal & sCampMask; }
+bool Piece::IsWhite() const { return mInternal & sWhiteMask; }
+bool Piece::IsBlack() const { return mInternal & sBlackMask; }
 
 bool Piece::IsAt(uint8_t row, uint8_t column) const {
-    uint16_t position = row | column << 4;
+    uint16_t position = row << 4 | column;
     return (mInternal & sPositionMask) == position;
 }
 
-void Piece::Move(uint8_t row, uint8_t column) {
-    uint16_t newPos = row + (column << 4);
-    mInternal &= ~sPositionMask | newPos;
+Piece Piece::Move(uint8_t row, uint8_t column) const {
+    Piece piece;
+    piece.mInternal = mInternal;
+
+    uint16_t newPos = (row << 4) + column;
+    piece.mInternal = (~sPositionMask & mInternal) | newPos;
+
+    if (!(mInternal & sCampMask)) {
+        return piece;
+    }
 
     if (mInternal & 1 << 12) {
         if (!(((column >= 3 || column < 6) && row == 0) ||
               (row == 1 && column == 4))) {
-            mInternal &= ~(1 << 12);
+            piece.mInternal &= ~(1 << 12);
         }
     } else if (mInternal & 1 << 11) {
         if (!(((row >= 3 || row < 6) && column == 9) ||
               (row == 4 && column == 8))) {
-            mInternal &= ~(1 << 11);
+            piece.mInternal &= ~(1 << 11);
         }
     } else if (mInternal & 1 << 10) {
         if (!(((column >= 3 || column < 6) && row == 9) ||
               (row == 8 && column == 4))) {
-            mInternal &= ~(1 << 10);
+            piece.mInternal &= ~(1 << 10);
         }
     } else if (mInternal & 1 << 9) {
         if (!(((row >= 3 || row < 6) && column == 0) ||
               (column == 1 && row == 4))) {
-            mInternal &= ~(1 << 9);
+            piece.mInternal &= ~(1 << 9);
         }
     }
+
+    return piece;
+}
+
+std::set<Piece> Tablut::WhitePieces() const {
+    std::set<Piece> pieces;
+    for (const auto &piece : mPieces) {
+        if (piece.IsWhite()) {
+            pieces.insert(piece);
+        }
+    }
+
+    return pieces;
+}
+
+std::set<Piece> Tablut::BlackPieces() const {
+    std::set<Piece> pieces;
+    for (const auto &piece : mPieces) {
+        if (piece.IsBlack()) {
+            pieces.insert(piece);
+        }
+    }
+
+    return pieces;
 }
 
 bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
@@ -162,19 +206,11 @@ bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
     return true;
 }
 
-std::optional<Piece> Tablut::PieceAt(uint8_t row, uint8_t column) const {
-    for (const auto &piece : mPieces) {
-        if (piece.IsAt(row, column)) {
-            return piece;
-        }
-    }
-
-    return {};
-}
-
+// NOTE: to generate camp moves, if the move is from the outside in, it is
+// invalid
 std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
-    const auto &piece = PieceAt(row, column);
-    if (!piece) {
+    const auto &piece = mPieces.find(Piece(row, column, Piece::Type::King));
+    if (piece == mPieces.end()) {
         return {};
     }
 
@@ -222,22 +258,33 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
 
 void Tablut::Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
                   uint8_t toColumn) {
-    for (auto &piece : mPieces) {
-        if (piece.IsAt(fromRow, fromColumn)) {
-            auto type = Piece::Type::Mercenary;
-            if (piece.IsGuard()) {
-                type = Piece::Type::Guard;
-            } else if (piece.IsKing()) {
-                type = Piece::Type::King;
-            }
-
-            piece.Move(toRow, toColumn);
-            return;
-        }
+    auto existing = mPieces.find(Piece(fromRow, fromColumn, Piece::Type::King));
+    if (existing == mPieces.end()) {
+        std::cerr << "Error: trying to move invalid piece from "
+                  << std::to_string(fromRow) << ", "
+                  << std::to_string(fromColumn) << std::endl;
+        return;
     }
+    auto type = Piece::Type::Mercenary;
+    if (existing->IsGuard()) {
+        type = Piece::Type::Guard;
+    } else if (existing->IsKing()) {
+        type = Piece::Type::King;
+    }
+    auto newPiece = existing->Move(toRow, toColumn);
+
+    mPieces.erase(existing);
+    mPieces.insert(newPiece);
 }
 
-std::string PrintCell(const Piece &cell) {
+std::string PrintPosition(const Position &position) {
+    std::stringstream ss;
+    ss << (char)(position.Column + 97) << std::to_string(position.Row + 1);
+
+    return ss.str();
+}
+
+std::string PrintPiece(const Piece &cell) {
     std::stringstream ss;
     ss << "Cell(";
     if (cell.IsKing()) {
@@ -252,29 +299,29 @@ std::string PrintCell(const Piece &cell) {
             ss << "(in camp), ";
         }
     }
-
-    ss << std::to_string(cell.Row()) << ", " << std::to_string(cell.Column())
-       << ")";
+    ss << PrintPosition(cell.Position()) << ")";
 
     return ss.str();
 }
 
-std::string PrintGrid(const Tablut &tablut) {
+std::string PrintTable(const Tablut &tablut) {
     std::stringstream ss;
 
-    ss << "-------------------------------------";
+    ss << "    a   b   c   d   e   f   g   h   i\n";
+    ss << "  -------------------------------------";
     for (uint8_t row = 0; row < 9; row++) {
-        ss << "\n";
+        ss << "\n" << std::to_string(row + 1) << " ";
         for (uint8_t column = 0; column < 9; column++) {
-            auto cell = tablut.PieceAt(row, column);
-            if (cell) {
-                if (cell->IsKing()) {
+            const auto piece =
+                tablut.Pieces().find(Piece(row, column, Piece::Type::King));
+            if (piece != tablut.Pieces().end()) {
+                if (piece->IsKing()) {
                     ss << "| K ";
                 }
-                if (cell->IsGuard()) {
+                if (piece->IsGuard()) {
                     ss << "| G ";
                 }
-                if (cell->IsMercenary()) {
+                if (piece->IsMercenary()) {
                     ss << "| M ";
                 }
             } else {
@@ -282,7 +329,7 @@ std::string PrintGrid(const Tablut &tablut) {
             }
         }
         ss << "|\n";
-        ss << "-------------------------------------";
+        ss << "  -------------------------------------";
     }
 
     return ss.str();
