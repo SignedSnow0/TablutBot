@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <ostream>
 #include <string>
 
 #include "connection/Socket.h"
@@ -70,10 +71,32 @@ int main(int argc, char **argv) {
                       << " (black to move)" << std::endl;
             std::cout << PrintTable(tablut) << std::endl;
 
-            const auto _discard = reader.ReceiveTable();
+            // Discard own table
+            const auto &[_discard, turn1] = reader.ReceiveTable();
+            if (turn1 != Turn::Black) {
+                if (turn1 == Turn::Draw) {
+                    std::cout << "End of game: draw" << std::endl;
+                } else if (turn1 == Turn::WhiteWin) {
+                    std::cout << "End of game: lose" << std::endl;
+                } else if (turn1 == Turn::BlackWin) {
+                    std::cout << "End of game: win" << std::endl;
+                }
+                return 0;
+            }
 
             // Receive Move
-            tablut = reader.ReceiveTable();
+            const auto &[table, turn] = reader.ReceiveTable();
+            if (turn != Turn::White) {
+                if (turn == Turn::Draw) {
+                    std::cout << "End of game: draw" << std::endl;
+                } else if (turn == Turn::WhiteWin) {
+                    std::cout << "End of game: you win" << std::endl;
+                } else if (turn == Turn::BlackWin) {
+                    std::cout << "End of game: you lose" << std::endl;
+                }
+                return 0;
+            }
+            tablut = table;
             moveIndex++;
 
             std::cout << "Table at move " << std::to_string(moveIndex)
@@ -83,7 +106,18 @@ int main(int argc, char **argv) {
     } else {
         while (true) {
             // Receive move
-            tablut = reader.ReceiveTable();
+            const auto &[table, turn] = reader.ReceiveTable();
+            if (turn != Turn::Black) {
+                if (turn == Turn::Draw) {
+                    std::cout << "End of game: draw" << std::endl;
+                } else if (turn == Turn::WhiteWin) {
+                    std::cout << "End of game: lose" << std::endl;
+                } else if (turn == Turn::BlackWin) {
+                    std::cout << "End of game: win" << std::endl;
+                }
+                return 0;
+            }
+            tablut = table;
             moveIndex++;
 
             std::cout << "Table at move " << std::to_string(moveIndex)
@@ -104,7 +138,18 @@ int main(int argc, char **argv) {
                       << " (white to move)" << std::endl;
             std::cout << PrintTable(tablut) << std::endl;
 
-            const auto _discard = reader.ReceiveTable();
+            // Discard own table
+            const auto &[_discard, turn1] = reader.ReceiveTable();
+            if (turn1 != Turn::White) {
+                if (turn1 == Turn::Draw) {
+                    std::cout << "End of game: draw" << std::endl;
+                } else if (turn1 == Turn::WhiteWin) {
+                    std::cout << "End of game: lose" << std::endl;
+                } else if (turn1 == Turn::BlackWin) {
+                    std::cout << "End of game: win" << std::endl;
+                }
+                return 0;
+            }
         }
     }
     return 0;

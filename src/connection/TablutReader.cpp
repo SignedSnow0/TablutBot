@@ -10,7 +10,7 @@ using json = nlohmann::json;
 TablutSocketReader::TablutSocketReader(const std::shared_ptr<Socket> &socket)
     : mSocket(socket) {}
 
-Tablut TablutSocketReader::ReceiveTable() const {
+std::pair<Tablut, Turn> TablutSocketReader::ReceiveTable() const {
     const auto data = mSocket->Receive();
     const auto parsed = json::parse(data);
 
@@ -29,7 +29,20 @@ Tablut TablutSocketReader::ReceiveTable() const {
         }
     }
 
-    return std::move(out);
+    Turn turn;
+    if (parsed["turn"] == "WHITE") {
+        turn = Turn::White;
+    } else if (parsed["turn"] == "BLACK") {
+        turn = Turn::Black;
+    } else if (parsed["turn"] == "DRAW") {
+        turn = Turn::Draw;
+    } else if (parsed["turn"] == "WHITEWIN") {
+        turn = Turn::WhiteWin;
+    } else if (parsed["turn"] == "BLACKWIN") {
+        turn = Turn::BlackWin;
+    }
+
+    return {std::move(out), turn};
 }
 
 bool TablutSocketReader::SameAs(const Tablut &server, const Tablut &client) {
