@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
                   << std::endl;
     }
 
-    auto tablut = Tablut::InitalConfiguration();
+    auto tablut = Tablut::InitialConfiguration();
     std::shared_ptr<Socket> socket;
     std::string player(argv[1]);
     bool isWhite = player == "WHITE" || player == "white";

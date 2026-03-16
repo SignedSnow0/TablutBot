@@ -44,26 +44,3 @@ std::pair<Tablut, Turn> TablutSocketReader::ReceiveTable() const {
 
     return {std::move(out), turn};
 }
-
-bool TablutSocketReader::SameAs(const Tablut &server, const Tablut &client) {
-    auto &serverPieces = server.Pieces();
-    auto &clientPieces = client.Pieces();
-
-    if (serverPieces.size() != clientPieces.size()) {
-        return false;
-    }
-
-    auto serverPiece = serverPieces.begin();
-    auto clientPiece = clientPieces.begin();
-    while (serverPiece != serverPieces.end()) {
-        if (serverPiece->Column() != clientPiece->Column() ||
-            serverPiece->Row() != clientPiece->Row()) {
-            return false;
-        }
-
-        serverPiece++;
-        clientPiece++;
-    }
-
-    return true;
-}
