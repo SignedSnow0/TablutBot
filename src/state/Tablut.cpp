@@ -1,4 +1,5 @@
 #include "Tablut.h"
+#include "utils/Logger.h"
 #include <cstdint>
 #include <iostream>
 #include <sstream>
@@ -211,6 +212,7 @@ bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
 std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     const auto &piece = mPieces.find(Piece(row, column, Piece::Type::King));
     if (piece == mPieces.end()) {
+        LOG_WARNING("Generating moves for empty position");
         return {};
     }
 
@@ -260,11 +262,10 @@ void Tablut::Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
                   uint8_t toColumn) {
     auto existing = mPieces.find(Piece(fromRow, fromColumn, Piece::Type::King));
     if (existing == mPieces.end()) {
-        std::cerr << "Error: trying to move invalid piece from "
-                  << std::to_string(fromRow) << ", "
-                  << std::to_string(fromColumn) << std::endl;
+        LOG_WARNING("Trying to move from empty position");
         return;
     }
+
     auto type = Piece::Type::Mercenary;
     if (existing->IsGuard()) {
         type = Piece::Type::Guard;

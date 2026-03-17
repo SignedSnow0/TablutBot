@@ -8,6 +8,7 @@
 #include "connection/TablutReader.h"
 #include "connection/TablutWriter.h"
 #include "state/Tablut.h"
+#include "utils/Logger.h"
 
 #define WHITE_PORT 5800
 #define BLACK_PORT 5801
@@ -32,12 +33,26 @@ int main(int argc, char **argv) {
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0] << " role serverIp timeout"
                   << std::endl;
+
+        Logger::Shutdown();
+        return 1;
     }
+    std::string player(argv[1]);
+    bool isWhite = player == "WHITE" || player == "white";
+
+    if (isWhite) {
+        Logger::Init("logs/white.log");
+    } else {
+        Logger::Init("logs/black.log");
+    }
+
+    LOG_DEBUG("Debug test");
+    LOG_INFO("Info test");
+    LOG_WARNING("Warning test");
+    LOG_ERROR("Error test");
 
     auto tablut = Tablut::InitialConfiguration();
     std::shared_ptr<Socket> socket;
-    std::string player(argv[1]);
-    bool isWhite = player == "WHITE" || player == "white";
     if (isWhite) {
         socket = Socket::Connect(argv[2], WHITE_PORT);
         socket->Send(BOT_NAME_WHITE);
@@ -81,6 +96,8 @@ int main(int argc, char **argv) {
                 } else if (turn1 == Turn::BlackWin) {
                     std::cout << "End of game: win" << std::endl;
                 }
+
+                Logger::Shutdown();
                 return 0;
             }
 
@@ -94,6 +111,8 @@ int main(int argc, char **argv) {
                 } else if (turn == Turn::BlackWin) {
                     std::cout << "End of game: you lose" << std::endl;
                 }
+
+                Logger::Shutdown();
                 return 0;
             }
             tablut = table;
@@ -115,6 +134,8 @@ int main(int argc, char **argv) {
                 } else if (turn == Turn::BlackWin) {
                     std::cout << "End of game: win" << std::endl;
                 }
+
+                Logger::Shutdown();
                 return 0;
             }
             tablut = table;
@@ -148,9 +169,13 @@ int main(int argc, char **argv) {
                 } else if (turn1 == Turn::BlackWin) {
                     std::cout << "End of game: win" << std::endl;
                 }
+
+                Logger::Shutdown();
                 return 0;
             }
         }
     }
+
+    Logger::Shutdown();
     return 0;
 }

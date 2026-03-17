@@ -28,18 +28,18 @@ for arg in "$@"; do
 done
 
 if $print_white; then 
-./bin/TablutBot WHITE localhost 60 | tee logs/white.log &
+./bin/TablutBot WHITE localhost 60 &
 WHITE_PID=$!
 else
-./bin/TablutBot WHITE localhost 60 1>logs/white.log 2>logs/white.err &
+./bin/TablutBot WHITE localhost 60 1>/dev/null 2>/dev/null &
 WHITE_PID=$!
 fi
 
 if $print_black; then
-./bin/TablutBot BLACK localhost 60 | tee logs/black.log &
+./bin/TablutBot BLACK localhost 60 &
 WHITE_PID=$!
 else
-./bin/TablutBot BLACK localhost 60 1>logs/black.log 2>logs/black.err &
+./bin/TablutBot BLACK localhost 60 1>/dev/null 2>/dev/null &
 BLACK_PID=$!
 fi
 

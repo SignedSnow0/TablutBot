@@ -1,7 +1,6 @@
 #include "Socket.h"
+#include "utils/Logger.h"
 #include <cstdint>
-#include <iostream>
-#include <stdexcept>
 #include <string>
 
 #ifdef __unix__
@@ -25,9 +24,9 @@ Socket::Socket(const std::string &ip, const uint32_t port)
     int status =
         getaddrinfo(ip.c_str(), std::to_string(port).c_str(), &hints, &res);
     if (status != 0) {
-        throw std::runtime_error("Failed to resolve ip " + ip + ":" +
-                                 std::to_string(port) + " (" +
-                                 gai_strerror(status) + ")");
+        LOG_ERROR("Failed to resolve {}:{} ({})", ip, port,
+                  gai_strerror(status));
+        return;
     }
 
     for (p = res; p != nullptr; p = p->ai_next) {
@@ -43,8 +42,7 @@ Socket::Socket(const std::string &ip, const uint32_t port)
         close(sock);
     }
 
-    throw std::runtime_error("Failed to connect to " + ip + ":" +
-                             std::to_string(port));
+    LOG_ERROR("Failed to connect to {}:{}", ip, port);
 }
 
 Socket::~Socket() { close(mSocket); }
@@ -58,6 +56,7 @@ std::string Socket::Receive() const {
     msg.resize(string_size);
 
     if (read(mSocket, msg.data(), string_size) <= 0) {
+        LOG_ERROR("Failed to read from socket");
         return "";
     }
 
@@ -68,10 +67,8 @@ void Socket::Send(const std::string &msg) const {
     uint32_t msg_length = ntohl(static_cast<uint32_t>(msg.size()));
     write(mSocket, &msg_length, sizeof(msg_length));
 
-    size_t sent = write(mSocket, msg.data(), msg.size());
-    if (sent != msg.size()) {
-        std::cerr << "Failed to send to socket: expected " << msg.size()
-                  << ", sent " << sent << std::endl;
+    if (write(mSocket, msg.data(), msg.size()) != msg.size()) {
+        LOG_ERROR("Failed to write to socket");
     }
 }
 #endif
