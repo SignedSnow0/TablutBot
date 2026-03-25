@@ -1,22 +1,11 @@
 #include "Tablut.h"
-#include "utils/Logger.h"
+
 #include <cstdint>
-#include <iostream>
 #include <sstream>
 #include <string>
 
-constexpr uint16_t sKingMask = 1 << 15;
-constexpr uint16_t sGuardMask = 1 << 14;
-constexpr uint16_t sMercenaryMask = 1 << 13;
-
-constexpr uint16_t sBlackMask = sMercenaryMask;
-constexpr uint16_t sWhiteMask = sKingMask | sGuardMask;
-
-constexpr uint16_t sCampMask = 1 << 12 | 1 << 11 | 1 << 10 | 1 << 9;
-
-constexpr uint16_t sRowMask = 1 << 7 | 1 << 6 | 1 << 5 | 1 << 4;
-constexpr uint16_t sColumnMask = 1 << 3 | 1 << 2 | 1 << 1 | 1 << 0;
-constexpr uint16_t sPositionMask = sRowMask | sColumnMask;
+#include "state/Piece.h"
+#include "utils/Logger.h"
 
 bool positionInTopCamp(uint8_t row, uint8_t column) {
     if (row == 0 && (column >= 3 && column < 6)) {
@@ -62,6 +51,15 @@ bool positionInLeftCamp(uint8_t row, uint8_t column) {
     return false;
 }
 
+bool positionInCamp(uint8_t row, uint8_t column) {
+    return positionInTopCamp(row, column) || positionInRightCamp(row, column) ||
+           positionInBottomCamp(row, column) || positionInLeftCamp(row, column);
+}
+
+bool positionIsUnreachable(uint8_t row, uint8_t column) {
+    return positionInCamp(row, column) || (row == 4 && column == 4);
+}
+
 bool isInSameCamp(const Piece &piece, uint8_t newRow, uint8_t newColumn) {
     if (!positionInTopCamp(newRow, newColumn) &&
         !positionInRightCamp(newRow, newColumn) &&
@@ -95,84 +93,14 @@ bool isInSameCamp(const Piece &piece, uint8_t newRow, uint8_t newColumn) {
     return false;
 }
 
-Piece::Piece(uint8_t row, uint8_t column, Type type, Camp camp) {
-    mInternal = 0;
-    mInternal |= column;
-    mInternal |= row << 4;
-
-    if (type == Type::King) {
-        mInternal |= sKingMask;
-    } else if (type == Type::Guard) {
-        mInternal |= sGuardMask;
-    } else if (type == Type::Mercenary) {
-        mInternal |= sMercenaryMask;
-
-        if (camp == Camp::Top) {
-            mInternal |= 1 << 12;
-        } else if (camp == Camp::Right) {
-            mInternal |= 1 << 11;
-        } else if (camp == Camp::Bottom) {
-            mInternal |= 1 << 10;
-        } else if (camp == Camp::Left) {
-            mInternal |= 1 << 9;
-        }
-    }
-}
-
-bool Piece::operator<(const Piece &r) const {
-    return (mInternal & sPositionMask) < (r.mInternal & sPositionMask);
-}
-
-uint8_t Piece::Row() const { return (mInternal & sRowMask) >> 4; }
-uint8_t Piece::Column() const { return mInternal & sColumnMask; }
-Position Piece::Position() const { return ::Position{Row(), Column()}; }
-
-bool Piece::IsKing() const { return mInternal & sKingMask; }
-bool Piece::IsGuard() const { return mInternal & sGuardMask; }
-bool Piece::IsMercenary() const { return mInternal & sMercenaryMask; }
-bool Piece::IsInCamp() const { return mInternal & sCampMask; }
-bool Piece::IsWhite() const { return mInternal & sWhiteMask; }
-bool Piece::IsBlack() const { return mInternal & sBlackMask; }
-
-bool Piece::IsAt(uint8_t row, uint8_t column) const {
-    uint16_t position = row << 4 | column;
-    return (mInternal & sPositionMask) == position;
-}
-
-Piece Piece::Move(uint8_t row, uint8_t column) const {
-    Piece piece;
-    piece.mInternal = mInternal;
-
-    uint16_t newPos = (row << 4) + column;
-    piece.mInternal = (~sPositionMask & mInternal) | newPos;
-
-    if (!(mInternal & sCampMask)) {
-        return piece;
+bool specialSquare(uint8_t row, uint8_t column) {
+    if ((row == 4 && column == 4) || positionInTopCamp(row, column) ||
+        positionInRightCamp(row, column) || positionInBottomCamp(row, column) ||
+        positionInLeftCamp(row, column)) {
+        return true;
     }
 
-    if (mInternal & 1 << 12) {
-        if (!(((column >= 3 || column < 6) && row == 0) ||
-              (row == 1 && column == 4))) {
-            piece.mInternal &= ~(1 << 12);
-        }
-    } else if (mInternal & 1 << 11) {
-        if (!(((row >= 3 || row < 6) && column == 9) ||
-              (row == 4 && column == 8))) {
-            piece.mInternal &= ~(1 << 11);
-        }
-    } else if (mInternal & 1 << 10) {
-        if (!(((column >= 3 || column < 6) && row == 9) ||
-              (row == 8 && column == 4))) {
-            piece.mInternal &= ~(1 << 10);
-        }
-    } else if (mInternal & 1 << 9) {
-        if (!(((row >= 3 || row < 6) && column == 0) ||
-              (column == 1 && row == 4))) {
-            piece.mInternal &= ~(1 << 9);
-        }
-    }
-
-    return piece;
+    return false;
 }
 
 std::set<Piece> Tablut::WhitePieces() const {
@@ -197,6 +125,16 @@ std::set<Piece> Tablut::BlackPieces() const {
     return pieces;
 }
 
+bool Tablut::HasKing() const {
+    for (const auto &piece : mPieces) {
+        if (piece.IsKing()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
     for (const auto &piece : mPieces) {
         if (piece.IsAt(row, column)) {
@@ -207,8 +145,8 @@ bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
     return true;
 }
 
-// NOTE: to generate camp moves, if the move is from the outside in, it is
-// invalid
+// NOTE: to generate camp moves, check only if the move is from the outside in,
+// then it is invalid
 std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     const auto &piece = mPieces.find(Piece(row, column, Piece::Type::King));
     if (piece == mPieces.end()) {
@@ -276,6 +214,115 @@ void Tablut::Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
 
     mPieces.erase(existing);
     mPieces.insert(newPiece);
+
+    CheckCapture(newPiece);
+}
+
+bool Tablut::PositionIsColor(uint8_t row, uint8_t column, bool white) {
+    const auto &piece = mPieces.find(Piece{row, column, Piece::Type::King});
+    if (piece == mPieces.end()) {
+        return false;
+    }
+
+    return white == piece->IsWhite();
+}
+
+void Tablut::CheckCapture(const Piece &movedPiece) {
+    uint8_t row = movedPiece.Row();
+    uint8_t column = movedPiece.Column();
+
+    if (movedPiece.IsWhite()) {
+        if (PositionIsColor(row - 1, column, false) &&
+            PositionIsColor(row - 2, column, true)) {
+            mPieces.erase(Piece(row - 1, column, Piece::Type::King));
+        }
+        if (PositionIsColor(row + 1, column, false) &&
+            PositionIsColor(row + 2, column, true)) {
+            mPieces.erase(Piece(row + 1, column, Piece::Type::King));
+        }
+        if (PositionIsColor(row, column - 1, false) &&
+            PositionIsColor(row, column - 2, true)) {
+            mPieces.erase(Piece(row, column - 1, Piece::Type::King));
+        }
+        if (PositionIsColor(row, column + 1, false) &&
+            PositionIsColor(row, column + 2, true)) {
+            mPieces.erase(Piece(row, column + 1, Piece::Type::King));
+        }
+
+    } else {
+        CheckKingCapture();
+
+        if (PositionIsColor(row - 1, column, true) &&
+            (PositionIsColor(row - 2, column, false) ||
+             positionIsUnreachable(row - 2, column))) {
+            mPieces.erase(Piece(row - 1, column, Piece::Type::King));
+        }
+        if (PositionIsColor(row + 1, column, true) &&
+            (PositionIsColor(row + 2, column, false) ||
+             positionIsUnreachable(row + 2, column))) {
+            mPieces.erase(Piece(row + 1, column, Piece::Type::King));
+        }
+        if (PositionIsColor(row, column - 1, true) &&
+            (PositionIsColor(row, column - 2, false) ||
+             positionIsUnreachable(row, column - 2))) {
+            mPieces.erase(Piece(row, column - 1, Piece::Type::King));
+        }
+        if (PositionIsColor(row, column + 1, true) &&
+            (PositionIsColor(row, column + 2, false) ||
+             positionIsUnreachable(row, column + 2))) {
+            mPieces.erase(Piece(row, column + 1, Piece::Type::King));
+        }
+    }
+}
+
+void Tablut::CheckKingCapture() {
+    auto king = mPieces.begin();
+    for (auto it = mPieces.begin(); it != mPieces.end(); it++) {
+        if (it->IsKing()) {
+            king = it;
+            break;
+        }
+    }
+
+    uint8_t kingRow = king->Row();
+    uint8_t kingColumn = king->Column();
+
+    if (kingRow == 4 && kingColumn == 4) {
+        if (PositionIsColor(kingRow - 1, kingColumn, false) &&
+            PositionIsColor(kingRow + 1, kingColumn, false) &&
+            PositionIsColor(kingRow, kingColumn - 1, false) &&
+            PositionIsColor(kingRow, kingColumn + 1, false)) {
+            mPieces.erase(king);
+        }
+    }
+    if (kingRow == 3 && kingColumn == 4) {
+        if (PositionIsColor(kingRow - 1, kingColumn, false) &&
+            PositionIsColor(kingRow, kingColumn - 1, false) &&
+            PositionIsColor(kingRow, kingColumn + 1, false)) {
+            mPieces.erase(king);
+        }
+    }
+    if (kingRow == 5 && kingColumn == 4) {
+        if (PositionIsColor(kingRow + 1, kingColumn, false) &&
+            PositionIsColor(kingRow, kingColumn - 1, false) &&
+            PositionIsColor(kingRow, kingColumn + 1, false)) {
+            mPieces.erase(king);
+        }
+    }
+    if (kingRow == 4 && kingColumn == 3) {
+        if (PositionIsColor(kingRow - 1, kingColumn, false) &&
+            PositionIsColor(kingRow + 1, kingColumn, false) &&
+            PositionIsColor(kingRow, kingColumn - 1, false)) {
+            mPieces.erase(king);
+        }
+    }
+    if (kingRow == 4 && kingColumn == 5) {
+        if (PositionIsColor(kingRow - 1, kingColumn, false) &&
+            PositionIsColor(kingRow + 1, kingColumn, false) &&
+            PositionIsColor(kingRow, kingColumn + 1, false)) {
+            mPieces.erase(king);
+        }
+    }
 }
 
 std::string PrintPosition(const Position &position) {
