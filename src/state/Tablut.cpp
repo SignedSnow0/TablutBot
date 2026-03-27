@@ -103,6 +103,48 @@ bool specialSquare(uint8_t row, uint8_t column) {
     return false;
 }
 
+bool Tablut::operator==(const Tablut &r) const {
+    if (mPieces.size() != r.mPieces.size()) {
+        return false;
+    }
+
+    auto lPiece = mPieces.begin();
+    auto rPiece = r.mPieces.begin();
+    while (lPiece != mPieces.end()) {
+        if (*lPiece != *rPiece) {
+            return false;
+        }
+
+        lPiece++;
+        rPiece++;
+    }
+
+    return true;
+}
+
+bool Tablut::IsSameAsServer(const Tablut &r) const {
+    if (mPieces.size() != r.mPieces.size()) {
+        return false;
+    }
+
+    auto lPiece = mPieces.begin();
+    auto rPiece = r.mPieces.begin();
+    while (lPiece != mPieces.end()) {
+        bool sameType = lPiece->IsBlack() == rPiece->IsBlack();
+        sameType &= lPiece->IsWhite() == rPiece->IsWhite();
+        sameType &= lPiece->IsKing() == rPiece->IsKing();
+
+        if (!sameType || lPiece->Position() != rPiece->Position()) {
+            return false;
+        }
+
+        lPiece++;
+        rPiece++;
+    }
+
+    return true;
+}
+
 std::set<Piece> Tablut::WhitePieces() const {
     std::set<Piece> pieces;
     for (const auto &piece : mPieces) {

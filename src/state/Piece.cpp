@@ -41,6 +41,10 @@ bool Piece::operator<(const Piece &r) const {
     return (mInternal & sPositionMask) < (r.mInternal & sPositionMask);
 }
 
+bool Piece::operator==(const Piece &r) const {
+    return mInternal == r.mInternal;
+}
+
 uint8_t Piece::Row() const { return (mInternal & sRowMask) >> 4; }
 uint8_t Piece::Column() const { return mInternal & sColumnMask; }
 Position Piece::Position() const { return ::Position{Row(), Column()}; }

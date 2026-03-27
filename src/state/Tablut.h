@@ -70,6 +70,10 @@ public:
         return result;
     }
 
+    [[nodiscard]] bool operator==(const Tablut &r) const;
+
+    [[nodiscard]] bool IsSameAsServer(const Tablut &r) const;
+
     /*
      * Returns the pieces currently on the board.
      * The pieces are ordered by their position, with the row having higher

@@ -19,9 +19,11 @@ add_executable(TablutBot
     src/main.cpp    
 )
 
-option(NO_LOG "Disables logging" OFF)
+option(USE_LOGS "Enables the logger system" ON)
 
-if(NO_LOG)
+if(USE_LOGS)
+    message(STATUS "Compiling with logs")
+else()
     add_definitions(-DNO_LOG)
     message(STATUS "Excluding logs")
 endif()

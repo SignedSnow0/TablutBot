@@ -1,5 +1,5 @@
 generate:
-	cmake -S . -B bin/ -DCMAKE_EXPORT_COMPILE_COMMANDS=true
+	cmake -S . -B bin/ -DCMAKE_EXPORT_COMPILE_COMMANDS=true -DUSE_LOGS=ON
 build: generate
 	cmake --build bin/
 lsp: generate

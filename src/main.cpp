@@ -87,13 +87,18 @@ int main(int argc, char **argv) {
             std::cout << PrintTable(tablut) << std::endl;
 
             // Discard own table
-            const auto &[_discard, turn1] = reader.ReceiveTable();
-            if (turn1 != Turn::Black) {
-                if (turn1 == Turn::Draw) {
+            const auto &[mirrorTable, blackTurn] = reader.ReceiveTable();
+            if (!tablut.IsSameAsServer(mirrorTable)) {
+                LOG_ERROR("Mismatch between internal state and server state\n "
+                          "Server is:\n{}\nClient is:\n{}",
+                          PrintTable(mirrorTable), PrintTable(tablut));
+            }
+            if (blackTurn != Turn::Black) {
+                if (blackTurn == Turn::Draw) {
                     std::cout << "End of game: draw" << std::endl;
-                } else if (turn1 == Turn::WhiteWin) {
+                } else if (blackTurn == Turn::WhiteWin) {
                     std::cout << "End of game: lose" << std::endl;
-                } else if (turn1 == Turn::BlackWin) {
+                } else if (blackTurn == Turn::BlackWin) {
                     std::cout << "End of game: win" << std::endl;
                 }
 
@@ -102,13 +107,13 @@ int main(int argc, char **argv) {
             }
 
             // Receive Move
-            const auto &[table, turn] = reader.ReceiveTable();
-            if (turn != Turn::White) {
-                if (turn == Turn::Draw) {
+            const auto &[table, whiteTurn] = reader.ReceiveTable();
+            if (whiteTurn != Turn::White) {
+                if (whiteTurn == Turn::Draw) {
                     std::cout << "End of game: draw" << std::endl;
-                } else if (turn == Turn::WhiteWin) {
+                } else if (whiteTurn == Turn::WhiteWin) {
                     std::cout << "End of game: you win" << std::endl;
-                } else if (turn == Turn::BlackWin) {
+                } else if (whiteTurn == Turn::BlackWin) {
                     std::cout << "End of game: you lose" << std::endl;
                 }
 
@@ -125,13 +130,13 @@ int main(int argc, char **argv) {
     } else {
         while (true) {
             // Receive move
-            const auto &[table, turn] = reader.ReceiveTable();
-            if (turn != Turn::Black) {
-                if (turn == Turn::Draw) {
+            const auto &[table, blackTurn] = reader.ReceiveTable();
+            if (blackTurn != Turn::Black) {
+                if (blackTurn == Turn::Draw) {
                     std::cout << "End of game: draw" << std::endl;
-                } else if (turn == Turn::WhiteWin) {
+                } else if (blackTurn == Turn::WhiteWin) {
                     std::cout << "End of game: lose" << std::endl;
-                } else if (turn == Turn::BlackWin) {
+                } else if (blackTurn == Turn::BlackWin) {
                     std::cout << "End of game: win" << std::endl;
                 }
 
@@ -160,13 +165,19 @@ int main(int argc, char **argv) {
             std::cout << PrintTable(tablut) << std::endl;
 
             // Discard own table
-            const auto &[_discard, turn1] = reader.ReceiveTable();
-            if (turn1 != Turn::White) {
-                if (turn1 == Turn::Draw) {
+            const auto &[mirrorTable, whiteTurn] = reader.ReceiveTable();
+            if (!tablut.IsSameAsServer(mirrorTable)) {
+                LOG_ERROR("Mismatch between internal state and server state\n "
+                          "Server is:\n{}\nClient is:\n{}",
+                          PrintTable(mirrorTable), PrintTable(tablut));
+            }
+
+            if (whiteTurn != Turn::White) {
+                if (whiteTurn == Turn::Draw) {
                     std::cout << "End of game: draw" << std::endl;
-                } else if (turn1 == Turn::WhiteWin) {
+                } else if (whiteTurn == Turn::WhiteWin) {
                     std::cout << "End of game: lose" << std::endl;
-                } else if (turn1 == Turn::BlackWin) {
+                } else if (whiteTurn == Turn::BlackWin) {
                     std::cout << "End of game: win" << std::endl;
                 }
 

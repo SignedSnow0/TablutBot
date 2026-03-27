@@ -7,6 +7,10 @@
 struct Position {
     uint8_t Row;
     uint8_t Column;
+
+    [[nodiscard]] inline bool operator==(const Position &r) const {
+        return Row == r.Row && Column == r.Column;
+    }
 };
 
 /*
@@ -39,6 +43,7 @@ public:
      * priority than the column.
      */
     bool operator<(const Piece &r) const;
+    bool operator==(const Piece &r) const;
 
     /*
      * Returns the row of the piece.
