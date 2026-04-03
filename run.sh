@@ -27,6 +27,10 @@ for arg in "$@"; do
     esac
 done
 
+java -jar ./lib/server/Server.jar &
+
+sleep 1
+
 if $print_white; then 
 ./bin/TablutBot WHITE localhost 60 &
 WHITE_PID=$!

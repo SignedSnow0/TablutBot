@@ -62,8 +62,7 @@ bool Piece::IsAt(uint8_t row, uint8_t column) const {
 }
 
 Piece Piece::Move(uint8_t row, uint8_t column) const {
-    Piece piece;
-    piece.mInternal = mInternal;
+    Piece piece{mInternal};
 
     uint16_t newPos = (row << 4) + column;
     piece.mInternal = (~sPositionMask & mInternal) | newPos;

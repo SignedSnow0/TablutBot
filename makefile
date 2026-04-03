@@ -1,7 +1,7 @@
 generate:
-	cmake -S . -B bin/ -DCMAKE_EXPORT_COMPILE_COMMANDS=true -DUSE_LOGS=ON
+	cmake -S . -B bin/ -DCMAKE_EXPORT_COMPILE_COMMANDS=true -DUSE_LOGS=ON -DCMAKE_BUILD_TYPE=Debug
 build: generate
-	cmake --build bin/
+	cmake --build bin/ --config Debug
 lsp: generate
 	cp bin/compile_commands.json .
 white: build

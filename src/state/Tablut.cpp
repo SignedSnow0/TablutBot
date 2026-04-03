@@ -60,19 +60,18 @@ bool positionIsUnreachable(uint8_t row, uint8_t column) {
     return positionInCamp(row, column) || (row == 4 && column == 4);
 }
 
-bool isInSameCamp(const Piece &piece, uint8_t newRow, uint8_t newColumn) {
-    if (!positionInTopCamp(newRow, newColumn) &&
+bool isInSameCamp(uint8_t pieceRow, uint8_t pieceColumn, uint8_t newRow,
+    uint8_t newColumn) {
+     if (!positionInTopCamp(newRow, newColumn) &&
         !positionInRightCamp(newRow, newColumn) &&
         !positionInBottomCamp(newRow, newColumn) &&
         !positionInLeftCamp(newRow, newColumn)) {
         return true;
     }
-    if (!piece.IsInCamp()) {
+    if (!positionInCamp(pieceRow, pieceColumn)) {
         return false;
     }
 
-    uint8_t pieceRow = piece.Row();
-    uint8_t pieceColumn = piece.Column();
     if (positionInTopCamp(pieceRow, pieceColumn) &&
         positionInTopCamp(newRow, newColumn)) {
         return true;
@@ -104,94 +103,71 @@ bool specialSquare(uint8_t row, uint8_t column) {
 }
 
 bool Tablut::operator==(const Tablut &r) const {
-    if (mPieces.size() != r.mPieces.size()) {
-        return false;
-    }
-
-    auto lPiece = mPieces.begin();
-    auto rPiece = r.mPieces.begin();
-    while (lPiece != mPieces.end()) {
-        if (*lPiece != *rPiece) {
-            return false;
-        }
-
-        lPiece++;
-        rPiece++;
-    }
-
-    return true;
+    return mWhiteBoard == r.mWhiteBoard && mBlackBoard == r.mBlackBoard &&
+           mKingBoard == r.mKingBoard;
 }
 
-bool Tablut::IsSameAsServer(const Tablut &r) const {
-    if (mPieces.size() != r.mPieces.size()) {
-        return false;
-    }
-
-    auto lPiece = mPieces.begin();
-    auto rPiece = r.mPieces.begin();
-    while (lPiece != mPieces.end()) {
-        bool sameType = lPiece->IsBlack() == rPiece->IsBlack();
-        sameType &= lPiece->IsWhite() == rPiece->IsWhite();
-        sameType &= lPiece->IsKing() == rPiece->IsKing();
-
-        if (!sameType || lPiece->Position() != rPiece->Position()) {
-            return false;
-        }
-
-        lPiece++;
-        rPiece++;
-    }
-
-    return true;
-}
-
-std::set<Piece> Tablut::WhitePieces() const {
-    std::set<Piece> pieces;
-    for (const auto &piece : mPieces) {
-        if (piece.IsWhite()) {
-            pieces.insert(piece);
+std::vector<Piece> Tablut::WhitePieces() const {
+    std::vector<Piece> pieces;
+    for (uint8_t row{0}; row < BOARD_SIZE; row++) {
+        for (uint8_t column{0}; column < BOARD_SIZE; column++) {
+            if (mWhiteBoard.test(row * BOARD_SIZE + column)) {
+                pieces.push_back(Piece(row, column, Piece::Type::Guard));
+            } else if (mKingBoard.test(row * BOARD_SIZE + column)) {
+                pieces.push_back(Piece(row, column, Piece::Type::King));
+            }
         }
     }
 
     return pieces;
 }
 
-std::set<Piece> Tablut::BlackPieces() const {
-    std::set<Piece> pieces;
-    for (const auto &piece : mPieces) {
-        if (piece.IsBlack()) {
-            pieces.insert(piece);
+std::vector<Piece> Tablut::BlackPieces() const {
+    std::vector<Piece> pieces;
+    for (uint8_t row{0}; row < BOARD_SIZE; row++) {
+        for (uint8_t column{0}; column < BOARD_SIZE; column++) {
+            if (mBlackBoard.test(row * BOARD_SIZE + column)) {
+                pieces.push_back(Piece(row, column, Piece::Type::Guard));
+            }
         }
     }
 
     return pieces;
 }
 
-bool Tablut::HasKing() const {
-    for (const auto &piece : mPieces) {
-        if (piece.IsKing()) {
-            return true;
-        }
+bool Tablut::HasKing() const { return mKingBoard.any(); }
+
+bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
+    if (row >= BOARD_SIZE || column >= BOARD_SIZE) {
+        return false;
+    }
+
+    return !mWhiteBoard.test(row * BOARD_SIZE + column) &&
+           !mBlackBoard.test(row * BOARD_SIZE + column) &&
+           !mKingBoard.test(row * BOARD_SIZE + column);
+}
+
+bool Tablut::IsType(uint8_t row, uint8_t column, Piece::Type type) const {
+    if (type == Piece::Type::King &&
+        mKingBoard.test(row * BOARD_SIZE + column)) {
+        return true;
+    }
+    if (type == Piece::Type::Guard &&
+        mWhiteBoard.test(row * BOARD_SIZE + column)) {
+        return true;
+    }
+    if (type == Piece::Type::Mercenary &&
+        mBlackBoard.test(row * BOARD_SIZE + column)) {
+        return true;
     }
 
     return false;
 }
 
-bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
-    for (const auto &piece : mPieces) {
-        if (piece.IsAt(row, column)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 // NOTE: to generate camp moves, check only if the move is from the outside in,
 // then it is invalid
 std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
-    const auto &piece = mPieces.find(Piece(row, column, Piece::Type::King));
-    if (piece == mPieces.end()) {
+    if (IsEmpty(row, column)) {
         LOG_WARNING("Generating moves for empty position");
         return {};
     }
@@ -200,7 +176,7 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     // NOTE: Insert in reverse order to generate sorted array
     for (int8_t r = row - 1; r >= 0; r--) {
         if (IsEmpty(r, column) && (r != 4 || column != 4) &&
-            isInSameCamp(*piece, static_cast<uint8_t>(r), column)) {
+            isInSameCamp(row, column, static_cast<uint8_t>(r), column)) {
             moves.push_back({static_cast<uint8_t>(r), column});
         } else {
             break;
@@ -210,7 +186,7 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     // NOTE: Insert in reverse order to generate sorted array
     for (int8_t c = column - 1; c >= 0; c--) {
         if (IsEmpty(row, c) && (row != 4 || c != 4) &&
-            isInSameCamp(*piece, row, static_cast<uint8_t>(c))) {
+            isInSameCamp(row, column, row, static_cast<uint8_t>(c))) {
             moves.push_back({row, static_cast<uint8_t>(c)});
         } else {
             break;
@@ -219,7 +195,7 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
 
     for (uint8_t c = column + 1; c < 9; c++) {
         if (IsEmpty(row, c) && (row != 4 || c != 4) &&
-            isInSameCamp(*piece, row, c)) {
+            isInSameCamp(row, column, row, c)) {
             moves.push_back({row, c});
         } else {
             break;
@@ -228,7 +204,7 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
 
     for (uint8_t r = row + 1; r < 9; r++) {
         if (IsEmpty(r, column) && (r != 4 || column != 4) &&
-            isInSameCamp(*piece, r, column)) {
+            isInSameCamp(row, column, r, column)) {
             moves.push_back({r, column});
         } else {
             break;
@@ -238,57 +214,88 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     return moves;
 }
 
+std::vector<std::pair<Position, Position>>
+Tablut::GenAllMoves(bool white) const {
+    std::vector<std::pair<Position, Position>> moves;
+    for (const auto &piece : white ? WhitePieces() : BlackPieces()) {
+        for (const auto &move : GenMoves(piece)) {
+            moves.push_back({piece.Position(), move});
+        }
+    }
+
+    return moves;
+}
+
 void Tablut::Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
                   uint8_t toColumn) {
-    auto existing = mPieces.find(Piece(fromRow, fromColumn, Piece::Type::King));
-    if (existing == mPieces.end()) {
+    if (IsEmpty(fromRow, fromColumn)) {
+        LOG_WARNING("Trying to move from empty position");
+        return;
+    }
+    if (!IsEmpty(toRow, toColumn)) {
         LOG_WARNING("Trying to move from empty position");
         return;
     }
 
-    auto type = Piece::Type::Mercenary;
-    if (existing->IsGuard()) {
-        type = Piece::Type::Guard;
-    } else if (existing->IsKing()) {
-        type = Piece::Type::King;
+    if (mWhiteBoard.test(fromRow * BOARD_SIZE + fromColumn)) {
+        mWhiteBoard.reset(fromRow * BOARD_SIZE + fromColumn);
+        mWhiteBoard.set(toRow * BOARD_SIZE + toColumn);
+
+        CheckCapture(toRow, toColumn, true);
     }
-    auto newPiece = existing->Move(toRow, toColumn);
+    if (mBlackBoard.test(fromRow * BOARD_SIZE + fromColumn)) {
+        mBlackBoard.reset(fromRow * BOARD_SIZE + fromColumn);
+        mBlackBoard.set(toRow * BOARD_SIZE + toColumn);
+        CheckCapture(toRow, toColumn, false);
+    }
+    if (mKingBoard.test(fromRow * BOARD_SIZE + fromColumn)) {
+        mKingBoard.reset(fromRow * BOARD_SIZE + fromColumn);
+        mKingBoard.set(toRow * BOARD_SIZE + toColumn);
+        CheckCapture(toRow, toColumn, true);
+    }
+}
 
-    mPieces.erase(existing);
-    mPieces.insert(newPiece);
+void Tablut::InsertWhite(uint8_t row, uint8_t column) {
+    mWhiteBoard.set(row * BOARD_SIZE + column);
+}
 
-    CheckCapture(newPiece);
+void Tablut::InsertBlack(uint8_t row, uint8_t column) {
+    mBlackBoard.set(row * BOARD_SIZE + column);
+}
+
+void Tablut::InsertKing(uint8_t row, uint8_t column) {
+    mKingBoard.set(row * BOARD_SIZE + column);
 }
 
 bool Tablut::PositionIsColor(uint8_t row, uint8_t column, bool white) {
-    const auto &piece = mPieces.find(Piece{row, column, Piece::Type::King});
-    if (piece == mPieces.end()) {
+    if (row >= BOARD_SIZE || column >= BOARD_SIZE) {
         return false;
     }
 
-    return white == piece->IsWhite();
+    if (IsEmpty(row, column)) {
+        return false;
+    }
+
+    return !white == mBlackBoard.test(row * BOARD_SIZE + column);
 }
 
-void Tablut::CheckCapture(const Piece &movedPiece) {
-    uint8_t row = movedPiece.Row();
-    uint8_t column = movedPiece.Column();
-
-    if (movedPiece.IsWhite()) {
+void Tablut::CheckCapture(uint8_t row, uint8_t column, bool isWhite) {
+    if (isWhite) {
         if (PositionIsColor(row - 1, column, false) &&
             PositionIsColor(row - 2, column, true)) {
-            mPieces.erase(Piece(row - 1, column, Piece::Type::King));
+            mBlackBoard.reset((row - 1) * BOARD_SIZE + column);
         }
         if (PositionIsColor(row + 1, column, false) &&
             PositionIsColor(row + 2, column, true)) {
-            mPieces.erase(Piece(row + 1, column, Piece::Type::King));
+            mBlackBoard.reset((row + 1) * BOARD_SIZE + column);
         }
         if (PositionIsColor(row, column - 1, false) &&
             PositionIsColor(row, column - 2, true)) {
-            mPieces.erase(Piece(row, column - 1, Piece::Type::King));
+            mBlackBoard.reset(row * BOARD_SIZE + (column - 1));
         }
         if (PositionIsColor(row, column + 1, false) &&
             PositionIsColor(row, column + 2, true)) {
-            mPieces.erase(Piece(row, column + 1, Piece::Type::King));
+            mBlackBoard.reset(row * BOARD_SIZE + (column + 1));
         }
 
     } else {
@@ -297,72 +304,72 @@ void Tablut::CheckCapture(const Piece &movedPiece) {
         if (PositionIsColor(row - 1, column, true) &&
             (PositionIsColor(row - 2, column, false) ||
              positionIsUnreachable(row - 2, column))) {
-            mPieces.erase(Piece(row - 1, column, Piece::Type::King));
+            mWhiteBoard.reset((row - 1) * BOARD_SIZE + column);
         }
         if (PositionIsColor(row + 1, column, true) &&
             (PositionIsColor(row + 2, column, false) ||
              positionIsUnreachable(row + 2, column))) {
-            mPieces.erase(Piece(row + 1, column, Piece::Type::King));
+            mWhiteBoard.reset((row + 1) * BOARD_SIZE + column);
         }
         if (PositionIsColor(row, column - 1, true) &&
             (PositionIsColor(row, column - 2, false) ||
              positionIsUnreachable(row, column - 2))) {
-            mPieces.erase(Piece(row, column - 1, Piece::Type::King));
+            mWhiteBoard.reset(row * BOARD_SIZE + (column - 1));
         }
         if (PositionIsColor(row, column + 1, true) &&
             (PositionIsColor(row, column + 2, false) ||
              positionIsUnreachable(row, column + 2))) {
-            mPieces.erase(Piece(row, column + 1, Piece::Type::King));
+            mWhiteBoard.reset(row * BOARD_SIZE + (column + 1));
         }
     }
 }
 
 void Tablut::CheckKingCapture() {
-    auto king = mPieces.begin();
-    for (auto it = mPieces.begin(); it != mPieces.end(); it++) {
-        if (it->IsKing()) {
-            king = it;
-            break;
+    uint8_t kingRow{0};
+    uint8_t kingColumn{0};
+
+    for (; kingRow < BOARD_SIZE; kingRow++) {
+        for (; kingColumn < BOARD_SIZE; kingColumn++) {
+            if (mKingBoard.test(kingRow * BOARD_SIZE + kingColumn)) {
+                break;
+            }
         }
     }
-
-    uint8_t kingRow = king->Row();
-    uint8_t kingColumn = king->Column();
 
     if (kingRow == 4 && kingColumn == 4) {
         if (PositionIsColor(kingRow - 1, kingColumn, false) &&
             PositionIsColor(kingRow + 1, kingColumn, false) &&
             PositionIsColor(kingRow, kingColumn - 1, false) &&
             PositionIsColor(kingRow, kingColumn + 1, false)) {
-            mPieces.erase(king);
+            mKingBoard.reset(kingRow * BOARD_SIZE + kingColumn);
         }
     }
     if (kingRow == 3 && kingColumn == 4) {
         if (PositionIsColor(kingRow - 1, kingColumn, false) &&
             PositionIsColor(kingRow, kingColumn - 1, false) &&
             PositionIsColor(kingRow, kingColumn + 1, false)) {
-            mPieces.erase(king);
+            mKingBoard.reset(kingRow * BOARD_SIZE + kingColumn);
         }
     }
     if (kingRow == 5 && kingColumn == 4) {
         if (PositionIsColor(kingRow + 1, kingColumn, false) &&
             PositionIsColor(kingRow, kingColumn - 1, false) &&
             PositionIsColor(kingRow, kingColumn + 1, false)) {
-            mPieces.erase(king);
+            mKingBoard.reset(kingRow * BOARD_SIZE + kingColumn);
         }
     }
     if (kingRow == 4 && kingColumn == 3) {
         if (PositionIsColor(kingRow - 1, kingColumn, false) &&
             PositionIsColor(kingRow + 1, kingColumn, false) &&
             PositionIsColor(kingRow, kingColumn - 1, false)) {
-            mPieces.erase(king);
+            mKingBoard.reset(kingRow * BOARD_SIZE + kingColumn);
         }
     }
     if (kingRow == 4 && kingColumn == 5) {
         if (PositionIsColor(kingRow - 1, kingColumn, false) &&
             PositionIsColor(kingRow + 1, kingColumn, false) &&
             PositionIsColor(kingRow, kingColumn + 1, false)) {
-            mPieces.erase(king);
+            mKingBoard.reset(kingRow * BOARD_SIZE + kingColumn);
         }
     }
 }
@@ -402,18 +409,12 @@ std::string PrintTable(const Tablut &tablut) {
     for (uint8_t row = 0; row < 9; row++) {
         ss << "\n" << std::to_string(row + 1) << " ";
         for (uint8_t column = 0; column < 9; column++) {
-            const auto piece =
-                tablut.Pieces().find(Piece(row, column, Piece::Type::King));
-            if (piece != tablut.Pieces().end()) {
-                if (piece->IsKing()) {
-                    ss << "| K ";
-                }
-                if (piece->IsGuard()) {
-                    ss << "| G ";
-                }
-                if (piece->IsMercenary()) {
-                    ss << "| M ";
-                }
+            if (tablut.IsType(row, column, Piece::Type::King)) {
+                ss << "| K ";
+            } else if (tablut.IsType(row, column, Piece::Type::Guard)) {
+                ss << "| G ";
+            } else if (tablut.IsType(row, column, Piece::Type::Mercenary)) {
+                ss << "| M ";
             } else {
                 ss << "|   ";
             }

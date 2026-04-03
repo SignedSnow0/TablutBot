@@ -1,10 +1,13 @@
 #pragma once
+#include <bitset>
+#include <climits>
 #include <cstdint>
-#include <set>
 #include <string>
 #include <vector>
 
 #include "state/Piece.h"
+
+#define BOARD_SIZE 9
 
 /*
  * Represents the state of a Tablut game.
@@ -16,96 +19,70 @@ public:
      */
     static Tablut InitialConfiguration() {
         Tablut result;
+        result.InsertBlack(0, 3);
+        result.InsertBlack(0, 4);
+        result.InsertBlack(0, 5);
+        result.InsertBlack(1, 4);
 
-        result.mPieces.insert(
-            Piece(0, 3, Piece::Type::Mercenary, Piece::Camp::Top));
-        result.mPieces.insert(
-            Piece(0, 4, Piece::Type::Mercenary, Piece::Camp::Top));
-        result.mPieces.insert(
-            Piece(0, 5, Piece::Type::Mercenary, Piece::Camp::Top));
-        result.mPieces.insert(
-            Piece(1, 4, Piece::Type::Mercenary, Piece::Camp::Top));
+        result.InsertBlack(8, 3);
+        result.InsertBlack(8, 4);
+        result.InsertBlack(8, 5);
+        result.InsertBlack(8, 4);
 
-        result.mPieces.insert(
-            Piece(8, 3, Piece::Type::Mercenary, Piece::Camp::Bottom));
-        result.mPieces.insert(
-            Piece(8, 4, Piece::Type::Mercenary, Piece::Camp::Bottom));
-        result.mPieces.insert(
-            Piece(8, 5, Piece::Type::Mercenary, Piece::Camp::Bottom));
-        result.mPieces.insert(
-            Piece(7, 4, Piece::Type::Mercenary, Piece::Camp::Bottom));
+        result.InsertBlack(3, 0);
+        result.InsertBlack(4, 0);
+        result.InsertBlack(5, 0);
+        result.InsertBlack(4, 1);
 
-        result.mPieces.insert(
-            Piece(3, 0, Piece::Type::Mercenary, Piece::Camp::Left));
-        result.mPieces.insert(
-            Piece(4, 0, Piece::Type::Mercenary, Piece::Camp::Left));
-        result.mPieces.insert(
-            Piece(5, 0, Piece::Type::Mercenary, Piece::Camp::Left));
-        result.mPieces.insert(
-            Piece(4, 1, Piece::Type::Mercenary, Piece::Camp::Left));
+        result.InsertBlack(3, 8);
+        result.InsertBlack(4, 8);
+        result.InsertBlack(5, 8);
+        result.InsertBlack(4, 7);
 
-        result.mPieces.insert(
-            Piece(3, 8, Piece::Type::Mercenary, Piece::Camp::Right));
-        result.mPieces.insert(
-            Piece(4, 8, Piece::Type::Mercenary, Piece::Camp::Right));
-        result.mPieces.insert(
-            Piece(5, 8, Piece::Type::Mercenary, Piece::Camp::Right));
-        result.mPieces.insert(
-            Piece(4, 7, Piece::Type::Mercenary, Piece::Camp::Right));
+        result.InsertWhite(3, 4);
+        result.InsertWhite(2, 4);
 
-        result.mPieces.insert(Piece(4, 4, Piece::Type::King));
+        result.InsertWhite(5, 4);
+        result.InsertWhite(6, 4);
 
-        result.mPieces.insert(Piece(3, 4, Piece::Type::Guard));
-        result.mPieces.insert(Piece(2, 4, Piece::Type::Guard));
+        result.InsertWhite(4, 3);
+        result.InsertWhite(4, 2);
 
-        result.mPieces.insert(Piece(5, 4, Piece::Type::Guard));
-        result.mPieces.insert(Piece(6, 4, Piece::Type::Guard));
+        result.InsertWhite(4, 5);
+        result.InsertWhite(4, 6);
 
-        result.mPieces.insert(Piece(4, 3, Piece::Type::Guard));
-        result.mPieces.insert(Piece(4, 2, Piece::Type::Guard));
-
-        result.mPieces.insert(Piece(4, 5, Piece::Type::Guard));
-        result.mPieces.insert(Piece(4, 6, Piece::Type::Guard));
+        result.InsertKing(4, 4);
 
         return result;
     }
 
     [[nodiscard]] bool operator==(const Tablut &r) const;
 
-    [[nodiscard]] bool IsSameAsServer(const Tablut &r) const;
-
-    /*
-     * Returns the pieces currently on the board.
-     * The pieces are ordered by their position, with the row having higher
-     * priority than the column.
-     */
-    [[nodiscard]] inline const std::set<Piece> &Pieces() const {
-        return mPieces;
-    }
-
     /*
      * Returns the white pieces currently on the board.
      * The pieces are ordered by their position, with the row having higher
      * priority than the column.
      */
-    std::set<Piece> WhitePieces() const;
+    [[nodiscard]] std::vector<Piece> WhitePieces() const;
     /*
      * Returns the black pieces currently on the board.
      * The pieces are ordered by their position, with the row having higher
      * priority than the column.
      */
-    std::set<Piece> BlackPieces() const;
+    [[nodiscard]] std::vector<Piece> BlackPieces() const;
 
     /*
      * Returns true if the table has the king.
      */
-    bool HasKing() const;
+    [[nodiscard]] bool HasKing() const;
     /**
      * Returns whether the square at the given position is empty.
      * @param row The row of the square, between 0 and 8.
      * @param column The column of the square, between 0 and 8.
      */
     [[nodiscard]] bool IsEmpty(uint8_t row, uint8_t column) const;
+    [[nodiscard]] bool IsType(uint8_t row, uint8_t column,
+                              Piece::Type type) const;
 
     /*
      * Generates the possible moves for the piece at the given position.
@@ -127,6 +104,9 @@ public:
     GenMoves(const Piece &piece) const {
         return GenMoves(piece.Row(), piece.Column());
     }
+
+    [[nodiscard]] std::vector<std::pair<Position, Position>>
+    GenAllMoves(bool white) const;
 
     /*
      * Moves the piece at the given position to the given position.
@@ -156,12 +136,17 @@ public:
     }
 
 private:
+    void InsertWhite(uint8_t row, uint8_t column);
+    void InsertBlack(uint8_t row, uint8_t column);
+    void InsertKing(uint8_t row, uint8_t column);
+
     bool PositionIsColor(uint8_t row, uint8_t column, bool white);
-    void CheckCapture(const Piece &movedPiece);
+    void CheckCapture(uint8_t row, uint8_t column, bool isWhite);
     void CheckKingCapture();
 
-    // TODO: black and white sets?
-    std::set<Piece> mPieces;
+    std::bitset<BOARD_SIZE * BOARD_SIZE> mBlackBoard;
+    std::bitset<BOARD_SIZE * BOARD_SIZE> mWhiteBoard;
+    std::bitset<BOARD_SIZE * BOARD_SIZE> mKingBoard;
 
     friend class TablutSocketReader;
 };

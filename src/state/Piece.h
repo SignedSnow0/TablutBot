@@ -99,6 +99,7 @@ public:
 
 private:
     Piece() = default;
+    Piece(uint16_t internal) : mInternal(internal) {}
 
     /*
      * Bit representation of a cell:

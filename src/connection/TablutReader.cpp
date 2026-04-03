@@ -20,11 +20,11 @@ std::pair<Tablut, Turn> TablutSocketReader::ReceiveTable() const {
     for (uint32_t row = 0; row < board.size(); row++) {
         for (uint32_t column = 0; column < board[row].size(); column++) {
             if (board[row][column] == "BLACK") {
-                out.mPieces.insert(Piece(row, column, Piece::Type::Mercenary));
+                out.InsertBlack(row, column);
             } else if (board[row][column] == "WHITE") {
-                out.mPieces.insert(Piece(row, column, Piece::Type::Guard));
+                out.InsertWhite(row, column);
             } else if (board[row][column] == "KING") {
-                out.mPieces.insert(Piece(row, column, Piece::Type::King));
+                out.InsertKing(row, column);
             }
         }
     }
