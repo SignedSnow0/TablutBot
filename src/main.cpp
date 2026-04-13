@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <iostream>
@@ -20,6 +19,7 @@
 #define BOT_NAME_BLACK "Joshua_Black"
 
 #define MAX_DEPTH 5
+#define NUM_THREADS 8
 
 void toLower(std::string &string) {
     for (char &c : string) {
@@ -44,7 +44,8 @@ int main(int argc, char **argv) {
         Logger::Init("logs/black.log");
     }
 
-    auto solver = Minimax();
+    auto solver = Minimax(std::max(atoi(argv[3]) * 1000 - 500, 1000),
+                          NUM_THREADS, MAX_DEPTH);
 
     std::shared_ptr<Socket> socket;
     if (isWhite) {
@@ -60,37 +61,32 @@ int main(int argc, char **argv) {
 
     TablutSocketReader reader(socket);
     TablutSocketWriter writer(socket);
-    const auto _discard = reader.ReceiveTable();
+    auto received = reader.ReceiveTable();
     uint32_t moveIndex{0};
 
     if (isWhite) {
         while (true) {
             // Make move
-            solver.Solve(MAX_DEPTH, true);
-            const auto &[fromPosition, toPosition] = solver.MaxMove();
+            int64_t value = solver.Solve(received.first, true);
+            const auto &[fromPosition, toPosition] = solver.BestMove();
 
-            LOG_INFO("Chosen move: {} to {}", PrintPosition(fromPosition),
-                     PrintPosition(toPosition));
+            LOG_INFO("Chosen move: {} -> {} with score of {}",
+                     PrintPosition(fromPosition), PrintPosition(toPosition),
+                     value);
             writer.WriteMove(fromPosition, toPosition, isWhite);
             moveIndex++;
 
-            const auto &[mirrorTable, blackTurn] = reader.ReceiveTable();
-            solver.ChangeRoot(mirrorTable);
-            if (solver.CurrentState() != mirrorTable) {
-                LOG_ERROR("Mismatch between internal state and server state\n "
-                          "Server is:\n{}\nClient is:\n{}",
-                          PrintTable(mirrorTable),
-                          PrintTable(solver.CurrentState()));
-            }
+            received = reader.ReceiveTable();
             // LOG_INFO("Table at move {} (black to move)\n{}", moveIndex,
             //          PrintTable(solver.CurrentState()));
 
-            if (blackTurn != Turn::Black) {
-                if (blackTurn == Turn::Draw) {
+            auto turn = received.second;
+            if (turn != Turn::Black) {
+                if (turn == Turn::Draw) {
                     LOG_INFO("End of game: draw");
-                } else if (blackTurn == Turn::WhiteWin) {
+                } else if (turn == Turn::WhiteWin) {
                     LOG_INFO("End of game: white won");
-                } else if (blackTurn == Turn::BlackWin) {
+                } else if (turn == Turn::BlackWin) {
                     LOG_INFO("End of game: black won");
                 }
 
@@ -99,14 +95,14 @@ int main(int argc, char **argv) {
             }
 
             // Receive Move
-            const auto &[table, whiteTurn] = reader.ReceiveTable();
-            solver.ChangeRoot(table);
-            if (whiteTurn != Turn::White) {
-                if (blackTurn == Turn::Draw) {
+            received = reader.ReceiveTable();
+            turn = received.second;
+            if (turn != Turn::White) {
+                if (turn == Turn::Draw) {
                     LOG_INFO("End of game: draw");
-                } else if (blackTurn == Turn::WhiteWin) {
+                } else if (turn == Turn::WhiteWin) {
                     LOG_INFO("End of game: white won");
-                } else if (blackTurn == Turn::BlackWin) {
+                } else if (turn == Turn::BlackWin) {
                     LOG_INFO("End of game: black won");
                 }
 
@@ -121,14 +117,14 @@ int main(int argc, char **argv) {
     } else {
         while (true) {
             // Receive move
-            const auto &[table, blackTurn] = reader.ReceiveTable();
-            solver.ChangeRoot(table);
-            if (blackTurn != Turn::Black) {
-                if (blackTurn == Turn::Draw) {
+            received = reader.ReceiveTable();
+            auto turn = received.second;
+            if (turn != Turn::Black) {
+                if (turn == Turn::Draw) {
                     LOG_INFO("End of game: draw");
-                } else if (blackTurn == Turn::WhiteWin) {
+                } else if (turn == Turn::WhiteWin) {
                     LOG_INFO("End of game: white won");
-                } else if (blackTurn == Turn::BlackWin) {
+                } else if (turn == Turn::BlackWin) {
                     LOG_INFO("End of game: black won");
                 }
 
@@ -141,31 +137,26 @@ int main(int argc, char **argv) {
             //          PrintTable(solver.CurrentState()));
 
             // Make move
-            solver.Solve(MAX_DEPTH, false);
-            const auto &[fromPosition, toPosition] = solver.MaxMove();
+            int64_t value = solver.Solve(received.first, false);
+            const auto &[fromPosition, toPosition] = solver.BestMove();
 
-            LOG_INFO("Chosen move: {} to {}", PrintPosition(fromPosition),
-                     PrintPosition(toPosition));
+            LOG_INFO("Chosen move: {} to {} with score of {}",
+                     PrintPosition(fromPosition), PrintPosition(toPosition),
+                     value);
             writer.WriteMove(fromPosition, toPosition, isWhite);
             moveIndex++;
 
-            const auto &[mirrorTable, whiteTurn] = reader.ReceiveTable();
-            solver.ChangeRoot(mirrorTable);
-            if (solver.CurrentState() != mirrorTable) {
-                LOG_ERROR("Mismatch between internal state and server state\n "
-                          "Server is:\n{}\nClient is:\n{}",
-                          PrintTable(mirrorTable),
-                          PrintTable(solver.CurrentState()));
-            }
+            received = reader.ReceiveTable();
+            turn = received.second;
             // LOG_INFO("Table at move {} (white to move)\n{}", moveIndex,
             //          PrintTable(solver.CurrentState()));
 
-            if (whiteTurn != Turn::White) {
-                if (blackTurn == Turn::Draw) {
+            if (turn != Turn::White) {
+                if (turn == Turn::Draw) {
                     LOG_INFO("End of game: draw");
-                } else if (blackTurn == Turn::WhiteWin) {
+                } else if (turn == Turn::WhiteWin) {
                     LOG_INFO("End of game: white won");
-                } else if (blackTurn == Turn::BlackWin) {
+                } else if (turn == Turn::BlackWin) {
                     LOG_INFO("End of game: black won");
                 }
                 Logger::Shutdown();

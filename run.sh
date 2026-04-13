@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+TIMEOUT=60
+
 function kill_bots()
 {
     kill -9 $WHITE_PID
@@ -27,27 +29,28 @@ for arg in "$@"; do
     esac
 done
 
-java -jar ./lib/server/Server.jar &
+if $print_white || $print_black; then
+    java -jar ./lib/server/Server.jar 1>/dev/null 2>/dev/null &
+else
+    java -jar ./lib/server/Server.jar &
+fi
 
 sleep 1
 
+./bin/TablutBot WHITE localhost $TIMEOUT &
+WHITE_PID=$!
+
+./bin/TablutBot BLACK localhost $TIMEOUT &
+BLACK_PID=$!
+
+trap kill_bots SIGINT
+
 if $print_white; then 
-./bin/TablutBot WHITE localhost 60 &
-WHITE_PID=$!
-else
-./bin/TablutBot WHITE localhost 60 1>/dev/null 2>/dev/null &
-WHITE_PID=$!
+    tail --follow ./logs/white.log
 fi
 
 if $print_black; then
-./bin/TablutBot BLACK localhost 60 &
-WHITE_PID=$!
-else
-./bin/TablutBot BLACK localhost 60 1>/dev/null 2>/dev/null &
-BLACK_PID=$!
+    tail --follow ./logs/black.log
 fi
 
-echo "Bots running, press ^C to stop"
-
-trap kill_bots SIGINT
 wait

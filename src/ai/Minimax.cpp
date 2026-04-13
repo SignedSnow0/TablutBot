@@ -1,232 +1,201 @@
 #include "Minimax.h"
-#include "state/Piece.h"
+
+#include "ai/Evaluations.h"
 #include "state/Tablut.h"
 #include "utils/Logger.h"
 
 #include <algorithm>
-#include <cmath>
+#include <chrono>
 #include <cstdint>
 #include <limits>
+#include <stop_token>
 
-static int64_t sAllocatedNodes{1};
-static int64_t sNumPrunes{0};
-static int64_t sEliminated{0};
+struct SearchResult {
+    std::atomic<int64_t> value;
+    std::atomic<uint32_t> index;
+    std::atomic<uint32_t> finished;
+};
 
-bool isInWinningPosition(const Position &position) {
+bool isInWinningPosition(const PiecePosition &position) {
     if ((position.Row == 0 || position.Row == 8) &&
         (position.Column == 1 || position.Column == 2 || position.Column == 6 ||
-         position.Column || 7)) {
+         position.Column == 7)) {
         return true;
     }
 
     if ((position.Column == 0 || position.Column == 8) &&
         (position.Row == 1 || position.Row == 2 || position.Row == 6 ||
-         position.Row || 7)) {
+         position.Row == 7)) {
         return true;
     }
 
     return false;
 }
 
-Node::~Node() {
-    sEliminated++;
-    for (const auto child : Children) {
-        delete child;
-    }
-}
+Minimax::Minimax(uint64_t timeout, uint32_t maxThreads, uint32_t depth)
+    : mTimeout(std::chrono::milliseconds(timeout)), mThreadPool(maxThreads),
+      mDepth(depth) {}
 
-bool isLeaf(const Tablut &state, bool isWhite) {
-    if (isWhite) {
-        const auto &pieces = state.WhitePieces();
-        for (const auto &piece : pieces) {
-            if (piece.IsKing() && isInWinningPosition(piece.Position())) {
-                return true;
+int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
+    const auto moves = initialState.GenAllMoves(isMax);
+    if (moves.empty()) {
+        return Evaluate(initialState, isMax);
+    }
+
+    SearchResult best;
+    best.value = isMax ? std::numeric_limits<int64_t>::min()
+                       : std::numeric_limits<int64_t>::max();
+    best.index = 0;
+    best.finished = 0;
+
+    for (uint32_t i = 0; i < moves.size(); i++) {
+        const auto [from, to] = moves[i];
+
+        mThreadPool.Submit([&, i, from, to, this](std::stop_token st) {
+            auto state = initialState.Move(from, to);
+
+            int64_t value = Solve(state, mDepth - 1, !isMax,
+                                  std::numeric_limits<int64_t>::min(),
+                                  std::numeric_limits<int64_t>::max(), st);
+
+            if (st.stop_requested()) {
+                return;
             }
-        }
 
-        return pieces.empty();
-    } else {
-        const auto &pieces = state.BlackPieces();
+            best.finished++;
 
-        return pieces.empty();
+            if (isMax) {
+                int64_t current = best.value.load();
+
+                while (value > current &&
+                       !best.value.compare_exchange_weak(current, value)) {
+                }
+
+                if (best.value.load() == value) {
+                    best.index.store(i);
+                }
+            } else {
+                int64_t current = best.value.load();
+
+                while (value < current &&
+                       !best.value.compare_exchange_weak(current, value)) {
+                }
+
+                if (best.value.load() == value) {
+                    best.index.store(i);
+                }
+            }
+        });
     }
+
+    mThreadPool.RunFor(mTimeout);
+
+    // std::this_thread:sleep_for(std::chrono::milliseconds(10));
+
+    if (best.finished == 0) {
+        LOG_WARNING("The search could not complete any branch in time, "
+                    "decreasing depth");
+        mDepth--;
+    } else if (best.finished == moves.size()) {
+        LOG_WARNING("The search terminated before the timeout");
+    }
+    LOG_INFO("Search terminated, completed {}/{} branches",
+             best.finished.load(), moves.size());
+
+    mBestMove = moves[best.index.load()];
+    return best.value.load();
 }
 
-void Node::AddChild(Node *node) { Children.push_back(node); }
-
-Minimax::Minimax() { mTree = new Node{Tablut::InitialConfiguration(), {}, {}}; }
-
-int64_t Minimax::Solve(uint32_t maxDepth, bool isMax) {
-    uint64_t allocated = sAllocatedNodes;
-
-    int64_t value =
-        Solve(mTree, maxDepth, isMax, std::numeric_limits<int64_t>::min(),
-              std::numeric_limits<int64_t>::max());
-
-    LOG_INFO("Allocated a total of {} nodes, {} pruned branches, "
-             "values, {} new nodes",
-             sAllocatedNodes, sNumPrunes, sAllocatedNodes - allocated);
-
-    sNumPrunes = 0;
-
-    return value;
-}
-
-void Minimax::ChangeRoot(const Tablut &state) {
-    sEliminated = 0;
-    const auto oldRoot = mTree;
-    mTree = nullptr;
-    for (const auto child : oldRoot->Children) {
-        if (child->State == state) {
-            mTree = child;
-        } else {
-            delete child;
-        }
+int64_t Minimax::Solve(const Tablut &state, uint32_t depth, bool isMax,
+                       int64_t alpha, int64_t beta, std::stop_token st) {
+    if (st.stop_requested()) {
+        return isMax ? std::numeric_limits<int64_t>::min()
+                     : std::numeric_limits<int64_t>::max();
     }
 
-    if (!mTree) {
-        LOG_WARNING("No cached state found for new root, creating new tree "
-                    "from received state");
-        mTree = new Node{std::move(state), {}, {}};
+    if (depth == 0) {
+        return Evaluate(state, isMax);
     }
 
-    operator delete(oldRoot); // deletes without calling the destructor
-
-    sAllocatedNodes -= sEliminated;
-
-    LOG_INFO("Nodes left after root change: {}", sAllocatedNodes);
-}
-
-int64_t Minimax::Solve(Node *tree, uint32_t maxDepth, bool isMax, int64_t alpha,
-                       int64_t beta) {
-    if (maxDepth == 0 || isLeaf(tree->State, isMax)) {
-        return Evaluate(tree->State, isMax);
-    }
-
-    const auto possibleMoves = tree->State.GenAllMoves(isMax);
-    if (possibleMoves.empty()) {
-        return Evaluate(tree->State, isMax);
-    }
+    const auto moves = state.GenAllMoves(isMax);
 
     if (isMax) {
-        int64_t max = std::numeric_limits<int64_t>::min();
-        if (!tree->Children.empty()) {
-            for (uint64_t i{0}; i < tree->Children.size(); i++) {
-                int64_t value =
-                    Solve(tree->Children[i], maxDepth - 1, false, alpha, beta);
-                if (value > max) {
-                    max = value;
-                    mMaxIndex = i;
-                }
-                alpha = std::max(alpha, value);
-                if (beta <= alpha) {
-                    sNumPrunes++;
-                    break;
-                }
-            }
+        int64_t maxEval = std::numeric_limits<int64_t>::min();
 
-            return max;
-        }
-
-        uint64_t i{0};
-        for (const auto &[from, to] : possibleMoves) {
-            auto newState = tree->State;
-            newState.Move(from, to);
-
-            auto child = new Node{newState, {}, {from, to}};
-
-            int64_t value = Solve(child, maxDepth - 1, false, alpha, beta);
-            if (value > max) {
-                max = value;
-                mMaxIndex = i;
-            }
-            alpha = std::max(alpha, value);
-            if (beta <= alpha) {
-                delete child;
-                sNumPrunes++;
+        for (const auto &[from, to] : moves) {
+            if (st.stop_requested()) {
                 break;
             }
 
-            sAllocatedNodes++;
-            tree->AddChild(child);
+            auto newState = state.Move(from, to);
+            int64_t eval = Solve(newState, depth - 1, false, alpha, beta, st);
 
-            i++;
+            maxEval = std::max(maxEval, eval);
+            alpha = std::max(alpha, eval);
+
+            if (beta <= alpha) {
+                break;
+            }
         }
 
-        return max;
+        return maxEval;
     } else {
-        int64_t min = std::numeric_limits<int64_t>::max();
-        if (!tree->Children.empty()) { // Reuse chached nodes
-            for (uint64_t i{0}; i < tree->Children.size(); i++) {
-                int64_t value =
-                    Solve(tree->Children[i], maxDepth - 1, false, alpha, beta);
-                if (value < min) {
-                    min = value;
-                    mMinIndex = i;
-                }
-                beta = std::min(beta, value);
-                if (beta <= alpha) {
-                    sNumPrunes++;
-                    break;
-                }
-            }
+        int64_t minEval = std::numeric_limits<int64_t>::max();
 
-            return min;
-        }
-
-        uint64_t i{0};
-        for (const auto &[from, to] : possibleMoves) {
-            auto newState = tree->State;
-            newState.Move(from, to);
-
-            auto child = new Node{newState, {}, {from, to}};
-            sAllocatedNodes++;
-
-            int64_t value = Solve(child, maxDepth - 1, true, alpha, beta);
-            if (value < min) {
-                min = value;
-                mMinIndex = i;
-            }
-            beta = std::min(beta, value);
-            if (beta <= alpha) {
-                delete child;
-                sNumPrunes++;
+        for (const auto &[from, to] : moves) {
+            if (st.stop_requested()) {
                 break;
             }
 
-            sAllocatedNodes++;
-            tree->AddChild(child);
+            auto newState = state.Move(from, to);
+            int64_t eval = Solve(newState, depth - 1, true, alpha, beta, st);
 
-            i++;
+            minEval = std::min(minEval, eval);
+            beta = std::min(beta, eval);
+
+            if (beta <= alpha) {
+                break;
+            }
         }
 
-        return min;
+        return minEval;
     }
 }
 
 int64_t Minimax::Evaluate(const Tablut &state, bool isMax) {
-    if (isMax) {
-        for (const auto &piece : state.WhitePieces()) {
-            if (piece.IsKing() && isInWinningPosition(piece.Position())) {
-                return std::numeric_limits<int64_t>::max();
-            }
-        }
-    } else {
-        bool kingFound = false;
-        for (const auto &piece : state.WhitePieces()) {
-            if (piece.IsKing()) {
-                kingFound = true;
-                break;
-            }
-        }
+    if (!state.HasKing()) {
+        return std::numeric_limits<int64_t>::min();
+    }
 
-        if (!kingFound) {
-            return std::numeric_limits<int64_t>::min();
-        }
+    auto kingPosition = state.King().Position;
+    if (isInWinningPosition(kingPosition)) {
+        return std::numeric_limits<int64_t>::max();
     }
 
     int64_t whitePieces = state.WhitePieces().size();
     int64_t blackPieces = state.BlackPieces().size();
+    if (isMax) {
+        int64_t value{0};
+        value += 1500 * EscapeRoutes(state, kingPosition);
+        value += 400 * CapturesNextMove(state, isMax);
+        value +=
+            200 * (BOARD_SIZE - 1 - BfsDistanceToEdge(state, kingPosition));
+        value += 120 * GuardsAdjacentKing(state, kingPosition);
+        value += 80 * (whitePieces - blackPieces);
+        value += 3 * PositionWeigthedKing(state);
+        value += 2 * PositionWeigthedWhite(state);
 
-    return isMax ? whitePieces - blackPieces : blackPieces - whitePieces;
+        value -= 250 * MercenariesAdjacentKing(state, kingPosition);
+
+        return value;
+    } else {
+        int64_t value{0};
+        value -= 1500 * (4 - EscapeRoutes(state, kingPosition));
+        value -= 400 * CapturesNextMove(state, isMax);
+        value -= 250 * MercenariesAdjacentKing(state, kingPosition);
+        value -= 80 * (blackPieces - whitePieces);
+        value -= 2 * PositionWeigthedBlack(state);
+
+        return value;
+    }
 }

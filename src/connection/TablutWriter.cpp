@@ -7,7 +7,7 @@
 
 using json = nlohmann::json;
 
-std::string positionToString(const Position &position) {
+std::string positionToString(const PiecePosition &position) {
     char column = (char)(position.Column + 97);
     std::string string = "";
     string.append(&column);
@@ -19,8 +19,8 @@ std::string positionToString(const Position &position) {
 TablutSocketWriter::TablutSocketWriter(const std::shared_ptr<Socket> &socket)
     : mSocket(socket) {}
 
-void TablutSocketWriter::WriteMove(const Position &fromPosition,
-                                   const Position &toPosition,
+void TablutSocketWriter::WriteMove(const PiecePosition &fromPosition,
+                                   const PiecePosition &toPosition,
                                    bool whiteTurn) const {
     auto outMsg = json::object();
     outMsg["from"] = positionToString(fromPosition);

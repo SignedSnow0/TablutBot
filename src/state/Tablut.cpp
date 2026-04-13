@@ -4,7 +4,6 @@
 #include <sstream>
 #include <string>
 
-#include "state/Piece.h"
 #include "utils/Logger.h"
 
 bool positionInTopCamp(uint8_t row, uint8_t column) {
@@ -56,13 +55,13 @@ bool positionInCamp(uint8_t row, uint8_t column) {
            positionInBottomCamp(row, column) || positionInLeftCamp(row, column);
 }
 
-bool positionIsUnreachable(uint8_t row, uint8_t column) {
+bool PositionIsUnreachable(uint8_t row, uint8_t column) {
     return positionInCamp(row, column) || (row == 4 && column == 4);
 }
 
 bool isInSameCamp(uint8_t pieceRow, uint8_t pieceColumn, uint8_t newRow,
-    uint8_t newColumn) {
-     if (!positionInTopCamp(newRow, newColumn) &&
+                  uint8_t newColumn) {
+    if (!positionInTopCamp(newRow, newColumn) &&
         !positionInRightCamp(newRow, newColumn) &&
         !positionInBottomCamp(newRow, newColumn) &&
         !positionInLeftCamp(newRow, newColumn)) {
@@ -92,16 +91,6 @@ bool isInSameCamp(uint8_t pieceRow, uint8_t pieceColumn, uint8_t newRow,
     return false;
 }
 
-bool specialSquare(uint8_t row, uint8_t column) {
-    if ((row == 4 && column == 4) || positionInTopCamp(row, column) ||
-        positionInRightCamp(row, column) || positionInBottomCamp(row, column) ||
-        positionInLeftCamp(row, column)) {
-        return true;
-    }
-
-    return false;
-}
-
 bool Tablut::operator==(const Tablut &r) const {
     return mWhiteBoard == r.mWhiteBoard && mBlackBoard == r.mBlackBoard &&
            mKingBoard == r.mKingBoard;
@@ -112,9 +101,9 @@ std::vector<Piece> Tablut::WhitePieces() const {
     for (uint8_t row{0}; row < BOARD_SIZE; row++) {
         for (uint8_t column{0}; column < BOARD_SIZE; column++) {
             if (mWhiteBoard.test(row * BOARD_SIZE + column)) {
-                pieces.push_back(Piece(row, column, Piece::Type::Guard));
+                pieces.push_back(Piece({row, column}, PieceType::Guard));
             } else if (mKingBoard.test(row * BOARD_SIZE + column)) {
-                pieces.push_back(Piece(row, column, Piece::Type::King));
+                pieces.push_back(Piece({row, column}, PieceType::King));
             }
         }
     }
@@ -127,7 +116,7 @@ std::vector<Piece> Tablut::BlackPieces() const {
     for (uint8_t row{0}; row < BOARD_SIZE; row++) {
         for (uint8_t column{0}; column < BOARD_SIZE; column++) {
             if (mBlackBoard.test(row * BOARD_SIZE + column)) {
-                pieces.push_back(Piece(row, column, Piece::Type::Guard));
+                pieces.push_back(Piece({row, column}, PieceType::Guard));
             }
         }
     }
@@ -136,6 +125,18 @@ std::vector<Piece> Tablut::BlackPieces() const {
 }
 
 bool Tablut::HasKing() const { return mKingBoard.any(); }
+
+Piece Tablut::King() const {
+    for (uint8_t row{0}; row < BOARD_SIZE; row++) {
+        for (uint8_t column{0}; column < BOARD_SIZE; column++) {
+            if (mKingBoard.test(row * BOARD_SIZE + column)) {
+                return Piece({row, column}, PieceType::King);
+            }
+        }
+    }
+
+    return Piece({255, 255}, PieceType::King);
+}
 
 bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
     if (row >= BOARD_SIZE || column >= BOARD_SIZE) {
@@ -147,16 +148,15 @@ bool Tablut::IsEmpty(uint8_t row, uint8_t column) const {
            !mKingBoard.test(row * BOARD_SIZE + column);
 }
 
-bool Tablut::IsType(uint8_t row, uint8_t column, Piece::Type type) const {
-    if (type == Piece::Type::King &&
-        mKingBoard.test(row * BOARD_SIZE + column)) {
+bool Tablut::IsType(uint8_t row, uint8_t column, PieceType type) const {
+    if (type == PieceType::King && mKingBoard.test(row * BOARD_SIZE + column)) {
         return true;
     }
-    if (type == Piece::Type::Guard &&
+    if (type == PieceType::Guard &&
         mWhiteBoard.test(row * BOARD_SIZE + column)) {
         return true;
     }
-    if (type == Piece::Type::Mercenary &&
+    if (type == PieceType::Mercenary &&
         mBlackBoard.test(row * BOARD_SIZE + column)) {
         return true;
     }
@@ -166,13 +166,13 @@ bool Tablut::IsType(uint8_t row, uint8_t column, Piece::Type type) const {
 
 // NOTE: to generate camp moves, check only if the move is from the outside in,
 // then it is invalid
-std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
+std::vector<PiecePosition> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     if (IsEmpty(row, column)) {
         LOG_WARNING("Generating moves for empty position");
         return {};
     }
 
-    auto moves = std::vector<Position>();
+    auto moves = std::vector<PiecePosition>();
     // NOTE: Insert in reverse order to generate sorted array
     for (int8_t r = row - 1; r >= 0; r--) {
         if (IsEmpty(r, column) && (r != 4 || column != 4) &&
@@ -214,45 +214,50 @@ std::vector<Position> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     return moves;
 }
 
-std::vector<std::pair<Position, Position>>
-Tablut::GenAllMoves(bool white) const {
-    std::vector<std::pair<Position, Position>> moves;
+std::vector<PieceMove> Tablut::GenAllMoves(bool white) const {
+    std::vector<PieceMove> moves;
     for (const auto &piece : white ? WhitePieces() : BlackPieces()) {
-        for (const auto &move : GenMoves(piece)) {
-            moves.push_back({piece.Position(), move});
+        for (const auto &move :
+             GenMoves(piece.Position.Row, piece.Position.Column)) {
+            moves.push_back({piece.Position, move});
         }
     }
 
     return moves;
 }
 
-void Tablut::Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
-                  uint8_t toColumn) {
+Tablut Tablut::Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
+                    uint8_t toColumn) const {
+    Tablut moved = Tablut{mBlackBoard, mWhiteBoard, mKingBoard};
     if (IsEmpty(fromRow, fromColumn)) {
         LOG_WARNING("Trying to move from empty position");
-        return;
+        return moved;
     }
     if (!IsEmpty(toRow, toColumn)) {
         LOG_WARNING("Trying to move from empty position");
-        return;
+        return moved;
     }
 
     if (mWhiteBoard.test(fromRow * BOARD_SIZE + fromColumn)) {
-        mWhiteBoard.reset(fromRow * BOARD_SIZE + fromColumn);
-        mWhiteBoard.set(toRow * BOARD_SIZE + toColumn);
+        moved.mWhiteBoard.reset(fromRow * BOARD_SIZE + fromColumn);
+        moved.mWhiteBoard.set(toRow * BOARD_SIZE + toColumn);
 
-        CheckCapture(toRow, toColumn, true);
+        moved.CheckCapture(toRow, toColumn, true);
     }
     if (mBlackBoard.test(fromRow * BOARD_SIZE + fromColumn)) {
-        mBlackBoard.reset(fromRow * BOARD_SIZE + fromColumn);
-        mBlackBoard.set(toRow * BOARD_SIZE + toColumn);
-        CheckCapture(toRow, toColumn, false);
+        moved.mBlackBoard.reset(fromRow * BOARD_SIZE + fromColumn);
+        moved.mBlackBoard.set(toRow * BOARD_SIZE + toColumn);
+
+        moved.CheckCapture(toRow, toColumn, false);
     }
     if (mKingBoard.test(fromRow * BOARD_SIZE + fromColumn)) {
-        mKingBoard.reset(fromRow * BOARD_SIZE + fromColumn);
-        mKingBoard.set(toRow * BOARD_SIZE + toColumn);
-        CheckCapture(toRow, toColumn, true);
+        moved.mKingBoard.reset(fromRow * BOARD_SIZE + fromColumn);
+        moved.mKingBoard.set(toRow * BOARD_SIZE + toColumn);
+
+        moved.CheckCapture(toRow, toColumn, true);
     }
+
+    return moved;
 }
 
 void Tablut::InsertWhite(uint8_t row, uint8_t column) {
@@ -303,22 +308,22 @@ void Tablut::CheckCapture(uint8_t row, uint8_t column, bool isWhite) {
 
         if (PositionIsColor(row - 1, column, true) &&
             (PositionIsColor(row - 2, column, false) ||
-             positionIsUnreachable(row - 2, column))) {
+             PositionIsUnreachable(row - 2, column))) {
             mWhiteBoard.reset((row - 1) * BOARD_SIZE + column);
         }
         if (PositionIsColor(row + 1, column, true) &&
             (PositionIsColor(row + 2, column, false) ||
-             positionIsUnreachable(row + 2, column))) {
+             PositionIsUnreachable(row + 2, column))) {
             mWhiteBoard.reset((row + 1) * BOARD_SIZE + column);
         }
         if (PositionIsColor(row, column - 1, true) &&
             (PositionIsColor(row, column - 2, false) ||
-             positionIsUnreachable(row, column - 2))) {
+             PositionIsUnreachable(row, column - 2))) {
             mWhiteBoard.reset(row * BOARD_SIZE + (column - 1));
         }
         if (PositionIsColor(row, column + 1, true) &&
             (PositionIsColor(row, column + 2, false) ||
-             positionIsUnreachable(row, column + 2))) {
+             PositionIsUnreachable(row, column + 2))) {
             mWhiteBoard.reset(row * BOARD_SIZE + (column + 1));
         }
     }
@@ -374,29 +379,9 @@ void Tablut::CheckKingCapture() {
     }
 }
 
-std::string PrintPosition(const Position &position) {
+std::string PrintPosition(const PiecePosition &position) {
     std::stringstream ss;
     ss << (char)(position.Column + 97) << std::to_string(position.Row + 1);
-
-    return ss.str();
-}
-
-std::string PrintPiece(const Piece &cell) {
-    std::stringstream ss;
-    ss << "Cell(";
-    if (cell.IsKing()) {
-        ss << "King, ";
-    }
-    if (cell.IsGuard()) {
-        ss << "Guard, ";
-    }
-    if (cell.IsMercenary()) {
-        ss << "Mercenary ";
-        if (cell.IsInCamp()) {
-            ss << "(in camp), ";
-        }
-    }
-    ss << PrintPosition(cell.Position()) << ")";
 
     return ss.str();
 }
@@ -409,11 +394,11 @@ std::string PrintTable(const Tablut &tablut) {
     for (uint8_t row = 0; row < 9; row++) {
         ss << "\n" << std::to_string(row + 1) << " ";
         for (uint8_t column = 0; column < 9; column++) {
-            if (tablut.IsType(row, column, Piece::Type::King)) {
+            if (tablut.IsType(row, column, PieceType::King)) {
                 ss << "| K ";
-            } else if (tablut.IsType(row, column, Piece::Type::Guard)) {
+            } else if (tablut.IsType(row, column, PieceType::Guard)) {
                 ss << "| G ";
-            } else if (tablut.IsType(row, column, Piece::Type::Mercenary)) {
+            } else if (tablut.IsType(row, column, PieceType::Mercenary)) {
                 ss << "| M ";
             } else {
                 ss << "|   ";

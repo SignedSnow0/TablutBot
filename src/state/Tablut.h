@@ -1,13 +1,29 @@
 #pragma once
 #include <bitset>
-#include <climits>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "state/Piece.h"
-
 #define BOARD_SIZE 9
+
+bool PositionIsUnreachable(uint8_t row, uint8_t column);
+
+struct PiecePosition {
+    uint8_t Row;
+    uint8_t Column;
+};
+
+struct PieceMove {
+    PiecePosition From;
+    PiecePosition To;
+};
+
+enum class PieceType { King, Guard, Mercenary };
+
+struct Piece {
+    PiecePosition Position;
+    PieceType Type;
+};
 
 /*
  * Represents the state of a Tablut game.
@@ -27,7 +43,7 @@ public:
         result.InsertBlack(8, 3);
         result.InsertBlack(8, 4);
         result.InsertBlack(8, 5);
-        result.InsertBlack(8, 4);
+        result.InsertBlack(7, 4);
 
         result.InsertBlack(3, 0);
         result.InsertBlack(4, 0);
@@ -75,6 +91,7 @@ public:
      * Returns true if the table has the king.
      */
     [[nodiscard]] bool HasKing() const;
+    [[nodiscard]] Piece King() const;
     /**
      * Returns whether the square at the given position is empty.
      * @param row The row of the square, between 0 and 8.
@@ -82,7 +99,7 @@ public:
      */
     [[nodiscard]] bool IsEmpty(uint8_t row, uint8_t column) const;
     [[nodiscard]] bool IsType(uint8_t row, uint8_t column,
-                              Piece::Type type) const;
+                              PieceType type) const;
 
     /*
      * Generates the possible moves for the piece at the given position.
@@ -91,22 +108,21 @@ public:
      * @param row The row of the piece, between 0 and 8.
      * @param column The column of the piece, between 0 and 8.
      */
-    [[nodiscard]] std::vector<Position> GenMoves(uint8_t row,
-                                                 uint8_t column) const;
-    /**
-     * Generates the possible moves for the given piece.
+    [[nodiscard]] std::vector<PiecePosition> GenMoves(uint8_t row,
+                                                      uint8_t column) const;
+    /*
+     * Generates the possible moves for the piece at the given position.
      * If there is no piece at the given position, an empty vector is returned.
      *
-     * @param piece The piece for which to generate moves, the method does not
-     * check if the piece given is the same as the one on the board.
+     * @param row The row of the piece, between 0 and 8.
+     * @param column The column of the piece, between 0 and 8.
      */
-    [[nodiscard]] inline std::vector<Position>
-    GenMoves(const Piece &piece) const {
-        return GenMoves(piece.Row(), piece.Column());
+    [[nodiscard]] inline std::vector<PiecePosition>
+    GenMoves(PiecePosition position) const {
+        return GenMoves(position.Row, position.Column);
     }
 
-    [[nodiscard]] std::vector<std::pair<Position, Position>>
-    GenAllMoves(bool white) const;
+    [[nodiscard]] std::vector<PieceMove> GenAllMoves(bool white) const;
 
     /*
      * Moves the piece at the given position to the given position.
@@ -119,8 +135,8 @@ public:
      * @param toRow The row of the destination, between 0 and 8.
      * @param toColumn The column of the destination, between 0 and
      */
-    void Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
-              uint8_t toColumn);
+    Tablut Move(uint8_t fromRow, uint8_t fromColumn, uint8_t toRow,
+                uint8_t toColumn) const;
     /*
      * Moves the piece at the given position to the given position.
      * The method does not check if the move is valid, it is the caller's
@@ -130,12 +146,20 @@ public:
      * @param fromPosition The position of the piece to move.
      * @param toPosition The position of the destination.
      */
-    inline void Move(Position fromPosition, Position toPosition) {
-        Move(fromPosition.Row, fromPosition.Column, toPosition.Row,
-             toPosition.Column);
+    inline Tablut Move(PiecePosition fromPosition,
+                       PiecePosition toPosition) const {
+        return Move(fromPosition.Row, fromPosition.Column, toPosition.Row,
+                    toPosition.Column);
     }
 
 private:
+    Tablut() = default;
+    Tablut(std::bitset<BOARD_SIZE * BOARD_SIZE> blackBoard,
+           std::bitset<BOARD_SIZE * BOARD_SIZE> whiteBoard,
+           std::bitset<BOARD_SIZE * BOARD_SIZE> kingBoard)
+        : mBlackBoard(blackBoard), mWhiteBoard(whiteBoard),
+          mKingBoard(kingBoard) {}
+
     void InsertWhite(uint8_t row, uint8_t column);
     void InsertBlack(uint8_t row, uint8_t column);
     void InsertKing(uint8_t row, uint8_t column);
@@ -157,13 +181,8 @@ private:
  * @param position The position to print.
  * @return The string representation of the position.
  */
-std::string PrintPosition(const Position &position);
-/*
- * Prints the given piece in a two-character format.
- * @param cell The piece to print.
- * @return The string representation of the piece.
- */
-std::string PrintPiece(const Piece &cell);
+std::string PrintPosition(const PiecePosition &position);
+
 /*
  * Prints the given Tablut board in a human-readable format.
  * @param tablut The Tablut board to print.

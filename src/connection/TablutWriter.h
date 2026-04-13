@@ -23,8 +23,8 @@ public:
      * @param toPosition The position to move the piece to.
      * @param whiteTurn Whether it is the white player's turn.
      */
-    void WriteMove(const Position &fromPosition, const Position &toPosition,
-                   bool whiteTurn) const;
+    void WriteMove(const PiecePosition &fromPosition,
+                   const PiecePosition &toPosition, bool whiteTurn) const;
 
 private:
     std::shared_ptr<Socket> mSocket;
