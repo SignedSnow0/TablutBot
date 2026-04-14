@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/Logger.h"
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -53,14 +54,21 @@ public:
         }
 
         std::this_thread::sleep_for(maxDuration);
+
         RequestStop();
+        WaitUntilIdle();
+        ClearQueue();
+        ResetState();
     }
 
     void Shutdown() {
-        RequestStop();
+        LOG_INFO("Shutdown");
+
+        for (auto &t : mPool) {
+            t.request_stop();
+        }
 
         mConditionVariable.notify_all();
-        mPool.clear();
     }
 
 private:
@@ -73,19 +81,38 @@ private:
         mConditionVariable.notify_all();
     }
 
-    void WorkerLoop(std::stop_token externalToken) {
-        auto token = mStopSource.get_token();
+    void WaitUntilIdle() {
+        std::unique_lock lock(mIdleMutex);
+        mIdleCv.wait(lock, [&] {
+            return mActiveTasks.load(std::memory_order_relaxed) == 0;
+        });
+    }
 
-        while (!token.stop_requested() && !externalToken.stop_requested()) {
+    void ClearQueue() {
+        std::lock_guard lock(mJobsMutex);
+        std::queue<std::function<void(std::stop_token)>> empty;
+        std::swap(mJobs, empty);
+    }
+
+    void ResetState() {
+        std::lock_guard lock(mJobsMutex);
+
+        mStopping = false;
+        mStopSource = std::stop_source();
+    }
+
+    void WorkerLoop(std::stop_token externalToken) {
+        while (!externalToken.stop_requested()) {
             std::function<void(std::stop_token)> task;
 
             {
                 std::unique_lock lock(mJobsMutex);
-                mConditionVariable.wait(
-                    lock, [&] { return mStopping || !mJobs.empty(); });
+                mConditionVariable.wait(lock, [&] {
+                    return externalToken.stop_requested() || !mJobs.empty();
+                });
 
                 if (mStopping && mJobs.empty()) {
-                    return;
+                    continue;
                 }
 
                 if (!mJobs.empty()) {
@@ -95,7 +122,15 @@ private:
             }
 
             if (task) {
+                mActiveTasks.fetch_add(1, std::memory_order_relaxed);
+
+                auto token = mStopSource.get_token();
                 task(token);
+
+                mActiveTasks.fetch_sub(1, std::memory_order_relaxed);
+
+                std::lock_guard lk(mIdleMutex);
+                mIdleCv.notify_all();
             }
         }
     }
@@ -105,6 +140,10 @@ private:
 
     std::mutex mJobsMutex;
     std::condition_variable mConditionVariable;
+
+    std::atomic<int> mActiveTasks = 0;
+    std::condition_variable mIdleCv;
+    std::mutex mIdleMutex;
 
     std::stop_source mStopSource;
     bool mStopping;

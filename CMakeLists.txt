@@ -8,6 +8,7 @@ add_executable(TablutBot
     src/ai/Evaluations.cpp
     src/ai/Minimax.cpp
     src/ai/ThreadPool.hpp
+    src/ai/TranspositionTable.cpp
 
     src/connection/Socket.cpp
     src/connection/TablutReader.cpp

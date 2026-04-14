@@ -3,6 +3,7 @@
 #include <stop_token>
 
 #include "ai/ThreadPool.hpp"
+#include "ai/TranspositionTable.h"
 #include "state/Tablut.h"
 
 class Minimax {
@@ -23,4 +24,5 @@ private:
     std::chrono::milliseconds mTimeout;
     ThreadPool mThreadPool;
     uint32_t mDepth;
+    TranspositionTable mTranspositionTable;
 };

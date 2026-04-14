@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TIMEOUT=60
+TIMEOUT=10
 
 function kill_bots()
 {

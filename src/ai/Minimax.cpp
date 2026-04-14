@@ -1,6 +1,7 @@
 #include "Minimax.h"
 
 #include "ai/Evaluations.h"
+#include "ai/TranspositionTable.h"
 #include "state/Tablut.h"
 #include "utils/Logger.h"
 
@@ -34,7 +35,7 @@ bool isInWinningPosition(const PiecePosition &position) {
 
 Minimax::Minimax(uint64_t timeout, uint32_t maxThreads, uint32_t depth)
     : mTimeout(std::chrono::milliseconds(timeout)), mThreadPool(maxThreads),
-      mDepth(depth) {}
+      mDepth(depth), mTranspositionTable(1 << 22) {}
 
 int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
     const auto moves = initialState.GenAllMoves(isMax);
@@ -97,7 +98,9 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
                     "decreasing depth");
         mDepth--;
     } else if (best.finished == moves.size()) {
-        LOG_WARNING("The search terminated before the timeout");
+        LOG_WARNING(
+            "The search terminated before the timeout, increasing depth");
+        mDepth++;
     }
     LOG_INFO("Search terminated, completed {}/{} branches",
              best.finished.load(), moves.size());
@@ -108,6 +111,29 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
 
 int64_t Minimax::Solve(const Tablut &state, uint32_t depth, bool isMax,
                        int64_t alpha, int64_t beta, std::stop_token st) {
+    const auto originalAlpha = alpha;
+
+    TTEntry entry;
+    if (mTranspositionTable.TryGet(state, isMax, entry)) {
+        if (entry.Depth >= depth) {
+            if (entry.Bound == BoundType::Exact) {
+                return entry.Score;
+            }
+
+            if (entry.Bound == BoundType::LowerBound) {
+                alpha = std::max(alpha, entry.Score);
+            }
+
+            if (entry.Bound == BoundType::UpperBound) {
+                beta = std::min(beta, entry.Score);
+            }
+
+            if (alpha >= beta) {
+                return entry.Score;
+            }
+        }
+    }
+
     if (st.stop_requested()) {
         return isMax ? std::numeric_limits<int64_t>::min()
                      : std::numeric_limits<int64_t>::max();
@@ -138,6 +164,16 @@ int64_t Minimax::Solve(const Tablut &state, uint32_t depth, bool isMax,
             }
         }
 
+        BoundType bound;
+        if (maxEval <= originalAlpha) {
+            bound = BoundType::UpperBound;
+        } else if (maxEval >= beta) {
+            bound = BoundType::LowerBound;
+        } else {
+            bound = BoundType::Exact;
+        }
+
+        mTranspositionTable.Insert(state, isMax, depth, maxEval, bound);
         return maxEval;
     } else {
         int64_t minEval = std::numeric_limits<int64_t>::max();
@@ -158,6 +194,16 @@ int64_t Minimax::Solve(const Tablut &state, uint32_t depth, bool isMax,
             }
         }
 
+        BoundType bound;
+        if (minEval <= originalAlpha) {
+            bound = BoundType::UpperBound;
+        } else if (minEval >= beta) {
+            bound = BoundType::LowerBound;
+        } else {
+            bound = BoundType::Exact;
+        }
+
+        mTranspositionTable.Insert(state, isMax, depth, minEval, bound);
         return minEval;
     }
 }

@@ -18,8 +18,8 @@
 #define BOT_NAME_WHITE "Joshua_White"
 #define BOT_NAME_BLACK "Joshua_Black"
 
-#define MAX_DEPTH 5
-#define NUM_THREADS 8
+#define MAX_DEPTH 4
+#define NUM_THREADS 4
 
 void toLower(std::string &string) {
     for (char &c : string) {
