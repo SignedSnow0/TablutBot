@@ -1,4 +1,3 @@
-#include <cctype>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -18,7 +17,7 @@
 #define BOT_NAME_WHITE "Joshua_White"
 #define BOT_NAME_BLACK "Joshua_Black"
 
-#define MAX_DEPTH 4
+#define MAX_DEPTH 6
 #define NUM_THREADS 4
 
 void toLower(std::string &string) {
@@ -28,6 +27,7 @@ void toLower(std::string &string) {
 }
 
 int main(int argc, char **argv) {
+
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0]
                   << " <role> <server_ip> <timeout (seconds)>" << std::endl;

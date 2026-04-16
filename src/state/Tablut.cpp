@@ -1,95 +1,11 @@
 #include "Tablut.h"
 
+#include "state/Utils.h"
+#include "utils/Logger.h"
+
 #include <cstdint>
 #include <sstream>
 #include <string>
-
-#include "utils/Logger.h"
-
-bool positionInTopCamp(uint8_t row, uint8_t column) {
-    if (row == 0 && (column >= 3 && column < 6)) {
-        return true;
-    }
-    if (row == 1 && column == 4) {
-        return true;
-    }
-
-    return false;
-}
-
-bool positionInRightCamp(uint8_t row, uint8_t column) {
-    if (column == 0 && (row >= 3 && column < 6)) {
-        return true;
-    }
-    if (row == 4 && column == 7) {
-        return true;
-    }
-
-    return false;
-}
-
-bool positionInBottomCamp(uint8_t row, uint8_t column) {
-    if (row == 8 && (column >= 3 && column < 6)) {
-        return true;
-    }
-    if (row == 7 & column == 4) {
-        return true;
-    }
-
-    return false;
-}
-
-bool positionInLeftCamp(uint8_t row, uint8_t column) {
-    if (column == 8 && (row >= 3 && column < 6)) {
-        return true;
-    }
-    if (row == 4 && column == 1) {
-        return true;
-    }
-
-    return false;
-}
-
-bool positionInCamp(uint8_t row, uint8_t column) {
-    return positionInTopCamp(row, column) || positionInRightCamp(row, column) ||
-           positionInBottomCamp(row, column) || positionInLeftCamp(row, column);
-}
-
-bool PositionIsUnreachable(uint8_t row, uint8_t column) {
-    return positionInCamp(row, column) || (row == 4 && column == 4);
-}
-
-bool isInSameCamp(uint8_t pieceRow, uint8_t pieceColumn, uint8_t newRow,
-                  uint8_t newColumn) {
-    if (!positionInTopCamp(newRow, newColumn) &&
-        !positionInRightCamp(newRow, newColumn) &&
-        !positionInBottomCamp(newRow, newColumn) &&
-        !positionInLeftCamp(newRow, newColumn)) {
-        return true;
-    }
-    if (!positionInCamp(pieceRow, pieceColumn)) {
-        return false;
-    }
-
-    if (positionInTopCamp(pieceRow, pieceColumn) &&
-        positionInTopCamp(newRow, newColumn)) {
-        return true;
-    }
-    if (positionInRightCamp(pieceRow, pieceColumn) &&
-        positionInRightCamp(newRow, newColumn)) {
-        return true;
-    }
-    if (positionInBottomCamp(pieceRow, pieceColumn) &&
-        positionInBottomCamp(newRow, newColumn)) {
-        return true;
-    }
-    if (positionInLeftCamp(pieceRow, pieceColumn) &&
-        positionInLeftCamp(newRow, newColumn)) {
-        return true;
-    }
-
-    return false;
-}
 
 bool Tablut::operator==(const Tablut &r) const {
     return mWhiteBoard == r.mWhiteBoard && mBlackBoard == r.mBlackBoard &&
@@ -176,7 +92,7 @@ std::vector<PiecePosition> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     // NOTE: Insert in reverse order to generate sorted array
     for (int8_t r = row - 1; r >= 0; r--) {
         if (IsEmpty(r, column) && (r != 4 || column != 4) &&
-            isInSameCamp(row, column, static_cast<uint8_t>(r), column)) {
+            IsInSameCamp(row, column, static_cast<uint8_t>(r), column)) {
             moves.push_back({static_cast<uint8_t>(r), column});
         } else {
             break;
@@ -186,7 +102,7 @@ std::vector<PiecePosition> Tablut::GenMoves(uint8_t row, uint8_t column) const {
     // NOTE: Insert in reverse order to generate sorted array
     for (int8_t c = column - 1; c >= 0; c--) {
         if (IsEmpty(row, c) && (row != 4 || c != 4) &&
-            isInSameCamp(row, column, row, static_cast<uint8_t>(c))) {
+            IsInSameCamp(row, column, row, static_cast<uint8_t>(c))) {
             moves.push_back({row, static_cast<uint8_t>(c)});
         } else {
             break;
@@ -195,7 +111,7 @@ std::vector<PiecePosition> Tablut::GenMoves(uint8_t row, uint8_t column) const {
 
     for (uint8_t c = column + 1; c < 9; c++) {
         if (IsEmpty(row, c) && (row != 4 || c != 4) &&
-            isInSameCamp(row, column, row, c)) {
+            IsInSameCamp(row, column, row, c)) {
             moves.push_back({row, c});
         } else {
             break;
@@ -204,7 +120,7 @@ std::vector<PiecePosition> Tablut::GenMoves(uint8_t row, uint8_t column) const {
 
     for (uint8_t r = row + 1; r < 9; r++) {
         if (IsEmpty(r, column) && (r != 4 || column != 4) &&
-            isInSameCamp(row, column, r, column)) {
+            IsInSameCamp(row, column, r, column)) {
             moves.push_back({r, column});
         } else {
             break;

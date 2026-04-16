@@ -15,14 +15,24 @@ public:
     [[nodiscard]] inline PieceMove BestMove() const { return mBestMove; }
 
 private:
-    int64_t Solve(const Tablut &state, uint32_t depth, bool isMax,
-                  int64_t alpha, int64_t beta, std::stop_token st);
+    struct SearchData {
+        int64_t value;
+        uint64_t cached = 0;
+        uint64_t evaluated = 0;
+        uint64_t interrupted = 0;
+        uint64_t pruned = 0;
+    };
+
+    SearchData Solve(const Tablut &state, uint32_t depth, bool isMax,
+                     int64_t alpha, int64_t beta, std::stop_token st);
 
     int64_t Evaluate(const Tablut &state, bool isMax);
 
-    PieceMove mBestMove;
+    PieceMove mBestMove{{4, 4}, {4, 4}};
     std::chrono::milliseconds mTimeout;
     ThreadPool mThreadPool;
     uint32_t mDepth;
     TranspositionTable mTranspositionTable;
+
+    Tablut mLastState;
 };

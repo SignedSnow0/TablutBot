@@ -5,6 +5,7 @@
 #include <queue>
 
 #include "state/Tablut.h"
+#include "state/Utils.h"
 
 uint8_t EscapeRoutes(const Tablut &t, const PiecePosition &king) {
     uint8_t routes{0};
@@ -138,8 +139,8 @@ bool CapturesNextMove(const Tablut &t, bool isWhite) {
         isWhite ? t.BlackPieces().size() : t.WhitePieces().size();
     for (const auto &[from, to] : moves) {
         const auto next = t.Move(from, to);
-        if ((isWhite ? next.BlackPieces().size()
-                    : next.WhitePieces().size()) < currentPieces) {
+        if ((isWhite ? next.BlackPieces().size() : next.WhitePieces().size()) <
+            currentPieces) {
             return true;
         }
     }

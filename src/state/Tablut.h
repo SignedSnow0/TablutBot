@@ -6,8 +6,6 @@
 
 #define BOARD_SIZE 9
 
-bool PositionIsUnreachable(uint8_t row, uint8_t column);
-
 struct PiecePosition {
     uint8_t Row;
     uint8_t Column;

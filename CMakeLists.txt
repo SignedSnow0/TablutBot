@@ -15,6 +15,7 @@ add_executable(TablutBot
     src/connection/TablutWriter.cpp
 
     src/state/Tablut.cpp
+    src/state/Utils.cpp
     
     src/utils/Logger.cpp
 
