@@ -133,21 +133,6 @@ uint8_t BfsDistanceToEdge(const Tablut &t, const PiecePosition &p) {
     return std::numeric_limits<uint8_t>::max();
 }
 
-bool CapturesNextMove(const Tablut &t, bool isWhite) {
-    const auto moves = t.GenAllMoves(isWhite);
-    const auto currentPieces =
-        isWhite ? t.BlackPieces().size() : t.WhitePieces().size();
-    for (const auto &[from, to] : moves) {
-        const auto next = t.Move(from, to);
-        if ((isWhite ? next.BlackPieces().size() : next.WhitePieces().size()) <
-            currentPieces) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 int64_t PositionWeigthedWhite(const Tablut &t) {
     static int64_t whitePST[9][9] = {{-20, -10, -5, -5, -5, -5, -5, -10, -20},
                                      {-10, 5, 10, 10, 10, 10, 10, 5, -10},

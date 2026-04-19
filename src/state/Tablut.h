@@ -9,11 +9,19 @@
 struct PiecePosition {
     uint8_t Row;
     uint8_t Column;
+
+    inline bool operator==(const PiecePosition &r) const {
+        return Row == r.Row && Column == r.Column;
+    }
 };
 
 struct PieceMove {
     PiecePosition From;
     PiecePosition To;
+
+    inline bool operator==(const PieceMove &r) const {
+        return From == r.From && To == r.To;
+    }
 };
 
 enum class PieceType { King, Guard, Mercenary };
@@ -22,6 +30,8 @@ struct Piece {
     PiecePosition Position;
     PieceType Type;
 };
+
+using BitBoard = std::bitset<BOARD_SIZE * BOARD_SIZE>;
 
 /*
  * Represents the state of a Tablut game.
@@ -152,9 +162,7 @@ public:
 
 private:
     Tablut() = default;
-    Tablut(std::bitset<BOARD_SIZE * BOARD_SIZE> blackBoard,
-           std::bitset<BOARD_SIZE * BOARD_SIZE> whiteBoard,
-           std::bitset<BOARD_SIZE * BOARD_SIZE> kingBoard)
+    Tablut(BitBoard blackBoard, BitBoard whiteBoard, BitBoard kingBoard)
         : mBlackBoard(blackBoard), mWhiteBoard(whiteBoard),
           mKingBoard(kingBoard) {}
 
@@ -166,9 +174,9 @@ private:
     void CheckCapture(uint8_t row, uint8_t column, bool isWhite);
     void CheckKingCapture();
 
-    std::bitset<BOARD_SIZE * BOARD_SIZE> mBlackBoard;
-    std::bitset<BOARD_SIZE * BOARD_SIZE> mWhiteBoard;
-    std::bitset<BOARD_SIZE * BOARD_SIZE> mKingBoard;
+    BitBoard mBlackBoard;
+    BitBoard mWhiteBoard;
+    BitBoard mKingBoard;
 
     friend class TablutSocketReader;
 };

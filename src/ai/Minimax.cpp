@@ -1,6 +1,7 @@
 #include "Minimax.h"
 
 #include "ai/Evaluations.h"
+#include "state/Tablut.h"
 #include "state/Utils.h"
 #include "utils/Logger.h"
 
@@ -9,6 +10,7 @@
 #include <cstdint>
 #include <limits>
 #include <stop_token>
+#include <vector>
 
 struct SearchResult {
     std::atomic<int64_t> value;
@@ -165,7 +167,8 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
         return result;
     }
 
-    const auto moves = state.GenAllMoves(isMax);
+    auto moves = state.GenAllMoves(isMax);
+    OrderMoves(moves, state, isMax);
 
     if (isMax) {
         int64_t maxEval = std::numeric_limits<int64_t>::min();
@@ -281,7 +284,6 @@ int64_t Minimax::Evaluate(const Tablut &state, bool isMax) {
     if (isMax) {
         int64_t value{0};
         value += 1500 * EscapeRoutes(state, kingPosition);
-        value += 400 * CapturesNextMove(state, isMax);
         value +=
             200 * (BOARD_SIZE - 1 - BfsDistanceToEdge(state, kingPosition));
         value += 120 * GuardsAdjacentKing(state, kingPosition);
@@ -295,11 +297,63 @@ int64_t Minimax::Evaluate(const Tablut &state, bool isMax) {
     } else {
         int64_t value{0};
         value -= 1500 * (4 - EscapeRoutes(state, kingPosition));
-        value -= 400 * CapturesNextMove(state, isMax);
         value -= 250 * MercenariesAdjacentKing(state, kingPosition);
         value -= 80 * (blackPieces - whitePieces);
         value -= 2 * PositionWeigthedBlack(state);
 
         return value;
     }
+}
+
+void Minimax::OrderMoves(std::vector<PieceMove> &moves, const Tablut &state,
+                         bool isMax) {
+    for (int i = 0; i < moves.size(); i++) {
+        int best = i;
+        int64_t bestScore = EvaluateMove(moves[i], state, isMax);
+
+        for (int j = i + 1; j < moves.size(); j++) {
+            int64_t s = EvaluateMove(moves[j], state, isMax);
+
+            if (s > bestScore) {
+                bestScore = s;
+                best = j;
+            }
+        }
+
+        std::swap(moves[i], moves[best]);
+    }
+}
+
+int64_t Minimax::EvaluateMove(const PieceMove &move, const Tablut &state,
+                              bool isMax) {
+    auto newState = state.Move(move.From, move.To);
+
+    if (!newState.HasKing() && !isMax) {
+        return std::numeric_limits<int64_t>::max();
+    }
+
+    auto newKingPos = newState.King().Position;
+    if (IsInWinningPosition(newKingPos) && isMax) {
+        return std::numeric_limits<int64_t>::max();
+    }
+
+    int64_t result{0};
+
+    auto kingPosition = state.King().Position;
+    if (move.From == kingPosition) {
+        int before = BfsDistanceToEdge(state, kingPosition);
+        int after = BfsDistanceToEdge(newState, newKingPos);
+
+        result += (before - after) * 1000;
+
+        uint8_t r1 = EscapeRoutes(state, kingPosition);
+        uint8_t r2 = EscapeRoutes(newState, newKingPos);
+
+        result += (int64_t)(r2 - r1) * 1000;
+    }
+
+    if (!isMax) {
+        result = -result;
+    }
+    return result;
 }
