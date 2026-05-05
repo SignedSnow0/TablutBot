@@ -164,7 +164,7 @@ int64_t PositionWeigthedBlack(const Tablut &t) {
                                      {40, 30, 20, 20, 20, 20, 20, 30, 40}};
 
     int64_t value{0};
-    for (const auto piece : t.WhitePieces()) {
+    for (const auto piece : t.BlackPieces()) {
         value += blackPST[piece.Position.Row][piece.Position.Column];
     }
 
