@@ -272,20 +272,9 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
 
 void Minimax::OrderMoves(std::vector<PieceMove> &moves, const Tablut &state,
                          bool isMax) {
-    for (int i = 0; i < moves.size(); i++) {
-        int best = i;
-        int64_t bestScore =
-            Heuristic::EvaluateMove(moves[i], state, isMax); // Updated
-
-        for (int j = i + 1; j < moves.size(); j++) {
-            int64_t s =
-                Heuristic::EvaluateMove(moves[j], state, isMax); // Updated
-
-            if (s > bestScore) {
-                bestScore = s;
-                best = j;
-            }
-        }
-        std::swap(moves[i], moves[best]);
-    }
+    std::sort(moves.begin(), moves.end(),
+              [&state, isMax](const PieceMove &a, const PieceMove &b) {
+                  return Heuristic::EvaluateMove(a, state, isMax) >
+                         Heuristic::EvaluateMove(b, state, isMax);
+              });
 }
