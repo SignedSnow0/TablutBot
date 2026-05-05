@@ -31,7 +31,7 @@ Minimax::Minimax(uint64_t timeout, uint32_t maxThreads, uint32_t depth)
 int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
     const auto moves = initialState.GenAllMoves(isMax);
     if (moves.empty()) {
-        return Evaluate(initialState, isMax);
+        return Heuristic::EvaluateState(initialState, isMax);
     }
 
     SearchResult best;
@@ -159,7 +159,8 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
     }
 
     if (depth == 0) {
-        auto value = Evaluate(state, isMax);
+        auto value = Heuristic::EvaluateState(state, isMax);
+
         SearchData result;
         result.value = value;
         result.evaluated = 1;
@@ -269,91 +270,22 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
     }
 }
 
-int64_t Minimax::Evaluate(const Tablut &state, bool isMax) {
-    if (!state.HasKing()) {
-        return std::numeric_limits<int64_t>::min();
-    }
-
-    auto kingPosition = state.King().Position;
-    if (IsInWinningPosition(kingPosition)) {
-        return std::numeric_limits<int64_t>::max();
-    }
-
-    int64_t whitePieces = state.WhitePieces().size();
-    int64_t blackPieces = state.BlackPieces().size();
-    if (isMax) {
-        int64_t value{0};
-        value += 1500 * EscapeRoutes(state, kingPosition);
-        value +=
-            200 * (BOARD_SIZE - 1 - BfsDistanceToEdge(state, kingPosition));
-        value += 120 * GuardsAdjacentKing(state, kingPosition);
-        value += 80 * (whitePieces - blackPieces);
-        value += 3 * PositionWeigthedKing(state);
-        value += 2 * PositionWeigthedWhite(state);
-
-        value -= 250 * MercenariesAdjacentKing(state, kingPosition);
-
-        return value;
-    } else {
-        int64_t value{0};
-        value -= 1500 * (4 - EscapeRoutes(state, kingPosition));
-        value -= 250 * MercenariesAdjacentKing(state, kingPosition);
-        value -= 80 * (blackPieces - whitePieces);
-        value -= 2 * PositionWeigthedBlack(state);
-
-        return value;
-    }
-}
-
 void Minimax::OrderMoves(std::vector<PieceMove> &moves, const Tablut &state,
                          bool isMax) {
     for (int i = 0; i < moves.size(); i++) {
         int best = i;
-        int64_t bestScore = EvaluateMove(moves[i], state, isMax);
+        int64_t bestScore =
+            Heuristic::EvaluateMove(moves[i], state, isMax); // Updated
 
         for (int j = i + 1; j < moves.size(); j++) {
-            int64_t s = EvaluateMove(moves[j], state, isMax);
+            int64_t s =
+                Heuristic::EvaluateMove(moves[j], state, isMax); // Updated
 
             if (s > bestScore) {
                 bestScore = s;
                 best = j;
             }
         }
-
         std::swap(moves[i], moves[best]);
     }
-}
-
-int64_t Minimax::EvaluateMove(const PieceMove &move, const Tablut &state,
-                              bool isMax) {
-    auto newState = state.Move(move.From, move.To);
-
-    if (!newState.HasKing() && !isMax) {
-        return std::numeric_limits<int64_t>::max();
-    }
-
-    auto newKingPos = newState.King().Position;
-    if (IsInWinningPosition(newKingPos) && isMax) {
-        return std::numeric_limits<int64_t>::max();
-    }
-
-    int64_t result{0};
-
-    auto kingPosition = state.King().Position;
-    if (move.From == kingPosition) {
-        int before = BfsDistanceToEdge(state, kingPosition);
-        int after = BfsDistanceToEdge(newState, newKingPos);
-
-        result += (before - after) * 1000;
-
-        uint8_t r1 = EscapeRoutes(state, kingPosition);
-        uint8_t r2 = EscapeRoutes(newState, newKingPos);
-
-        result += (int64_t)(r2 - r1) * 1000;
-    }
-
-    if (!isMax) {
-        result = -result;
-    }
-    return result;
 }
