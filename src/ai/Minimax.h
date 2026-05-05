@@ -27,12 +27,9 @@ private:
     SearchData Solve(const Tablut &state, uint32_t depth, bool isMax,
                      int64_t alpha, int64_t beta, std::stop_token st);
 
-    int64_t Evaluate(const Tablut &state, bool isMax);
-
     void OrderMoves(std::vector<PieceMove> &moves, const Tablut &state,
                     bool isMax);
-    int64_t EvaluateMove(const PieceMove &move, const Tablut &state,
-                         bool isMax);
+
 
     PieceMove mBestMove{{4, 4}, {4, 4}};
     std::chrono::milliseconds mTimeout;
