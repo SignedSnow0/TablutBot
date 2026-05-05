@@ -2,3 +2,4 @@
 bin/
 logs/
 compile_commands.json
+.vscode/
