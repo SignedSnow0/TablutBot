@@ -1,6 +1,7 @@
 #include "Minimax.h"
 
 #include "ai/Evaluations.h"
+#include "ai/Heuristic.h"
 #include "state/Tablut.h"
 #include "state/Utils.h"
 #include "utils/Logger.h"
@@ -11,6 +12,8 @@
 #include <limits>
 #include <stop_token>
 #include <vector>
+
+static constexpr int64_t TT_BEST_MOVE_BONUS = 10000000;
 
 struct SearchResult {
     std::atomic<int64_t> value;
@@ -173,6 +176,7 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
 
     if (isMax) {
         int64_t maxEval = std::numeric_limits<int64_t>::min();
+        PieceMove bestMoveInPosition{}; // updated as better moves are found
 
         SearchData result;
         for (const auto &[from, to] : moves) {
@@ -197,8 +201,12 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
             result.evaluated += partialResult.evaluated;
             result.interrupted += partialResult.interrupted;
 
-            maxEval = std::max(maxEval, partialResult.value);
-            alpha = std::max(alpha, partialResult.value);
+            if (partialResult.value > maxEval) {
+                maxEval = partialResult.value;
+                bestMoveInPosition = {from, to};
+            }
+
+            alpha = std::max(alpha, maxEval);
 
             if (beta <= alpha) {
                 result.pruned++;
@@ -215,12 +223,14 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
             bound = BoundType::Exact;
         }
 
-        mTranspositionTable.Insert(state, isMax, depth, maxEval, bound);
+        mTranspositionTable.Insert(state, isMax, depth, maxEval, bound,
+                                   bestMoveInPosition);
 
         result.value = maxEval;
         return result;
     } else {
         int64_t minEval = std::numeric_limits<int64_t>::max();
+        PieceMove bestMoveInPosition{}; // updated as better moves are found
 
         SearchData result;
         for (const auto &[from, to] : moves) {
@@ -245,8 +255,12 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
             result.evaluated += partialResult.evaluated;
             result.interrupted += partialResult.interrupted;
 
-            minEval = std::min(minEval, partialResult.value);
-            beta = std::min(beta, partialResult.value);
+            if (partialResult.value < minEval) {
+                minEval = partialResult.value;
+                bestMoveInPosition = {from, to};
+            }
+
+            beta = std::min(beta, minEval);
 
             if (beta <= alpha) {
                 result.pruned++;
@@ -263,7 +277,8 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
             bound = BoundType::Exact;
         }
 
-        mTranspositionTable.Insert(state, isMax, depth, minEval, bound);
+        mTranspositionTable.Insert(state, isMax, depth, minEval, bound,
+                                   bestMoveInPosition);
 
         result.value = minEval;
         return result;
@@ -272,9 +287,18 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
 
 void Minimax::OrderMoves(std::vector<PieceMove> &moves, const Tablut &state,
                          bool isMax) {
+    TTEntry entry;
+    bool hasTTMove = mTranspositionTable.TryGet(state, isMax, entry);
+
     std::sort(moves.begin(), moves.end(),
-              [&state, isMax](const PieceMove &a, const PieceMove &b) {
-                  return Heuristic::EvaluateMove(a, state, isMax) >
-                         Heuristic::EvaluateMove(b, state, isMax);
+              [&state, isMax, hasTTMove, &entry](const PieceMove &a,
+                                                 const PieceMove &b) {
+                  int64_t scoreA = Heuristic::EvaluateMove(a, state, isMax);
+                  int64_t scoreB = Heuristic::EvaluateMove(b, state, isMax);
+
+                  if (hasTTMove && a == entry.BestMove) scoreA += TT_BEST_MOVE_BONUS;
+                  if (hasTTMove && b == entry.BestMove) scoreB += TT_BEST_MOVE_BONUS;
+
+                  return scoreA > scoreB;
               });
 }

@@ -30,6 +30,10 @@ struct TTEntry {
     int64_t Score;     ///< The evaluated score of the board state.
     BoundType Bound; ///< The type of bound this score represents (Exact, Lower,
                      ///< or Upper).
+    PieceMove BestMove; ///< The best move found for this board state. Valid for
+                        ///< all BoundType values; for non-Exact bounds it
+                        ///< represents the move that caused the cutoff and is
+                        ///< still useful for move ordering.
 };
 
 /**
@@ -125,14 +129,16 @@ public:
      * @param depth The search depth used to achieve this score.
      * @param score The evaluated score.
      * @param boundType The type of bound (Exact, LowerBound, UpperBound).
+     * @param bestMove The best move found for this position.
      */
     void Insert(uint64_t hash, bool isWhite, uint32_t depth, int64_t score,
-                BoundType boundType) {
+                BoundType boundType, PieceMove bestMove) {
         auto &item = mTable[hash % mTableSize];
         item.Hash = hash;
         item.Score = score;
         item.Depth = depth;
         item.Bound = boundType;
+        item.BestMove = bestMove;
     }
 
     /**
@@ -143,10 +149,12 @@ public:
      * @param depth The search depth used to achieve this score.
      * @param score The evaluated score.
      * @param boundType The type of bound (Exact, LowerBound, UpperBound).
+     * @param bestMove The best move found for this position.
      */
     void Insert(const Tablut &state, bool isWhite, uint32_t depth,
-                int64_t score, BoundType boundType) {
-        Insert(ComputeHash(state, isWhite), isWhite, depth, score, boundType);
+                int64_t score, BoundType boundType, PieceMove bestMove) {
+        Insert(ComputeHash(state, isWhite), isWhite, depth, score, boundType,
+               bestMove);
     }
 
     /**

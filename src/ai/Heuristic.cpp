@@ -116,8 +116,8 @@ int64_t Heuristic::EvaluateMove(const PieceMove &move, const Tablut &state,
     if (isKingMove) {
         // If the King moved, prioritize moves that take it closer to the edges
         // (0 or 8)
-        int distRow = std::min(move.To.Row, BOARD_SIZE_L1 - move.To.Row);
-        int distCol = std::min(move.To.Column, BOARD_SIZE_L1 - move.To.Column);
+        int distRow = std::min((int)move.To.Row, BOARD_SIZE_L1 - move.To.Row);
+        int distCol = std::min((int)move.To.Column, BOARD_SIZE_L1 - move.To.Column);
         int distanceToEdge = std::min(distRow, distCol);
 
         // Lower distance to edge is better for White
