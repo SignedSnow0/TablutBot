@@ -28,8 +28,11 @@ struct SearchResult {
 
 Minimax::Minimax(uint64_t timeout, uint32_t maxThreads, uint32_t depth)
     : mTimeout(std::chrono::milliseconds(timeout)), mThreadPool(maxThreads),
-      mDepth(depth), mTranspositionTable(1 << 22),
-      mLastState(Tablut::InitialConfiguration()) {}
+      mDepth(depth), mTranspositionTable(1 << 22) {}
+
+void Minimax::RegisterState(const Tablut &state, bool isWhite) {
+    mGameHistory.push_back(mTranspositionTable.ComputeHash(state, isWhite));
+}
 
 int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
     const auto moves = initialState.GenAllMoves(isMax);
@@ -47,11 +50,13 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
         const auto [from, to] = moves[i];
 
         mThreadPool.Submit([&, i, from, to, this](std::stop_token st) {
+            std::vector<uint64_t> localSearchHistory;
             auto state = initialState.Move(from, to);
 
             SearchData result = Solve(state, mDepth - 1, !isMax,
                                       std::numeric_limits<int64_t>::min(),
-                                      std::numeric_limits<int64_t>::max(), st);
+                                      std::numeric_limits<int64_t>::max(), st,
+                                      localSearchHistory);
             best.pruned.fetch_add(result.pruned, std::memory_order_relaxed);
             best.interrupted.fetch_add(result.interrupted,
                                        std::memory_order_relaxed);
@@ -108,8 +113,6 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
              "cached, {} pruned, {} interrupted",
              best.finished.load(), moves.size(), best.evaluated.load(),
              best.cached.load(), best.pruned.load(), best.interrupted.load());
-
-    mLastState = mLastState.Move(mBestMove.From, mBestMove.To);
     mBestMove = moves[best.index.load()];
 
     return best.value.load();
@@ -117,8 +120,26 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
 
 Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
                                    bool isMax, int64_t alpha, int64_t beta,
-                                   std::stop_token st) {
+                                   std::stop_token st,
+                                   std::vector<uint64_t> &searchHistory) {
     const auto originalAlpha = alpha;
+    const auto stateHash = mTranspositionTable.ComputeHash(state, isMax);
+
+    if (std::find(mGameHistory.begin(), mGameHistory.end(), stateHash) !=
+            mGameHistory.end() ||
+        std::find(searchHistory.begin(), searchHistory.end(), stateHash) !=
+            searchHistory.end()) {
+        SearchData partialResult;
+        partialResult.evaluated = 1;
+        partialResult.value = 0;
+        return partialResult;
+    }
+
+    searchHistory.push_back(stateHash);
+    struct SearchHistoryScopeGuard {
+        std::vector<uint64_t> &history;
+        ~SearchHistoryScopeGuard() { history.pop_back(); }
+    } historyGuard{searchHistory};
 
     TTEntry entry;
     if (mTranspositionTable.TryGet(state, isMax, entry)) {
@@ -186,16 +207,9 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
 
             auto newState = state.Move(from, to);
 
-            if (newState == mLastState) {
-                SearchData partialResult;
-                partialResult.evaluated = 1;
-                partialResult.value = 0;
-
-                return partialResult;
-            }
-
             SearchData partialResult =
-                Solve(newState, depth - 1, false, alpha, beta, st);
+                Solve(newState, depth - 1, false, alpha, beta, st,
+                      searchHistory);
             result.pruned += partialResult.pruned;
             result.cached += partialResult.cached;
             result.evaluated += partialResult.evaluated;
@@ -240,16 +254,9 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
 
             auto newState = state.Move(from, to);
 
-            if (newState == mLastState) {
-                SearchData partialResult;
-                partialResult.evaluated = 1;
-                partialResult.value = 0;
-
-                return partialResult;
-            }
-
             SearchData partialResult =
-                Solve(newState, depth - 1, true, alpha, beta, st);
+                Solve(newState, depth - 1, true, alpha, beta, st,
+                      searchHistory);
             result.pruned += partialResult.pruned;
             result.cached += partialResult.cached;
             result.evaluated += partialResult.evaluated;
