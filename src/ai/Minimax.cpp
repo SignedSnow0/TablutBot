@@ -136,10 +136,10 @@ Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
     }
 
     searchHistory.push_back(stateHash);
-    struct SearchHistoryPop {
+    struct SearchHistoryScopeGuard {
         std::vector<uint64_t> &history;
-        ~SearchHistoryPop() { history.pop_back(); }
-    } pop{searchHistory};
+        ~SearchHistoryScopeGuard() { history.pop_back(); }
+    } historyGuard{searchHistory};
 
     TTEntry entry;
     if (mTranspositionTable.TryGet(state, isMax, entry)) {
