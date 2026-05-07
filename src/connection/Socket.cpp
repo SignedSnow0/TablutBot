@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#ifdef __unix__
+#if defined(__unix__) || defined(__APPLE__)
 #include <arpa/inet.h>
 #include <memory.h>
 #include <netdb.h>
