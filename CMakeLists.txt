@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 add_executable(TablutBot
     src/ai/Evaluations.cpp
+    src/ai/Heuristic.cpp
     src/ai/Minimax.cpp
     src/ai/ThreadPool.hpp
     src/ai/TranspositionTable.cpp

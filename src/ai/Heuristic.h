@@ -11,9 +11,4 @@ public:
     // Fast evaluation of a single move for move-ordering
     static int64_t EvaluateMove(const PieceMove &move, const Tablut &state,
                                 bool isMax);
-
-private:
-    // Private discriminators for player-specific logic
-    static int64_t WhitePlayerHeuristic(const Tablut &state);
-    static int64_t BlackPlayerHeuristic(const Tablut &state);
 };
