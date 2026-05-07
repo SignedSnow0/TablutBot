@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
     TablutSocketReader reader(socket);
     TablutSocketWriter writer(socket);
     auto received = reader.ReceiveTable();
+    solver.RegisterState(received.first, received.second == Turn::White);
     uint32_t moveIndex{0};
 
     if (isWhite) {
@@ -77,6 +78,7 @@ int main(int argc, char **argv) {
             moveIndex++;
 
             received = reader.ReceiveTable();
+            solver.RegisterState(received.first, received.second == Turn::White);
             // LOG_INFO("Table at move {} (black to move)\n{}", moveIndex,
             //          PrintTable(solver.CurrentState()));
 
@@ -96,6 +98,7 @@ int main(int argc, char **argv) {
 
             // Receive Move
             received = reader.ReceiveTable();
+            solver.RegisterState(received.first, received.second == Turn::White);
             turn = received.second;
             if (turn != Turn::White) {
                 if (turn == Turn::Draw) {
@@ -118,6 +121,7 @@ int main(int argc, char **argv) {
         while (true) {
             // Receive move
             received = reader.ReceiveTable();
+            solver.RegisterState(received.first, received.second == Turn::White);
             auto turn = received.second;
             if (turn != Turn::Black) {
                 if (turn == Turn::Draw) {
@@ -147,6 +151,7 @@ int main(int argc, char **argv) {
             moveIndex++;
 
             received = reader.ReceiveTable();
+            solver.RegisterState(received.first, received.second == Turn::White);
             turn = received.second;
             // LOG_INFO("Table at move {} (white to move)\n{}", moveIndex,
             //          PrintTable(solver.CurrentState()));
