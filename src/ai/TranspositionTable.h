@@ -1,7 +1,10 @@
 #pragma once
 
 #include "state/Tablut.h"
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <mutex>
 
 #define NUM_PIECE_TYPES 3
 
@@ -54,6 +57,8 @@ struct TTIndex {
  */
 class TranspositionTable {
 public:
+    static constexpr size_t NUM_STRIPES = 1024;
+
     /**
      * @brief Constructs the Transposition Table and initializes the Zobrist
      * keys.
@@ -94,7 +99,9 @@ public:
      * @return True if a valid entry exists at this index, false if it is empty.
      */
     bool TryGet(uint64_t hash, TTEntry &entry) {
-        auto &item = mTable[hash % mTableSize];
+        const auto index = hash % mTableSize;
+        std::lock_guard<std::mutex> lock(mMutexes[index % NUM_STRIPES]);
+        auto &item = mTable[index];
         if (item.Hash == 0) {
             return false;
         }
@@ -113,7 +120,9 @@ public:
      */
     bool TryGet(const Tablut &state, bool isWhite, TTEntry &entry) {
         auto hash = ComputeHash(state, isWhite);
-        auto &item = mTable[hash % mTableSize];
+        const auto index = hash % mTableSize;
+        std::lock_guard<std::mutex> lock(mMutexes[index % NUM_STRIPES]);
+        auto &item = mTable[index];
         if (item.Hash == 0) {
             return false;
         }
@@ -133,7 +142,9 @@ public:
      */
     void Insert(uint64_t hash, bool isWhite, uint32_t depth, int64_t score,
                 BoundType boundType, PieceMove bestMove) {
-        auto &item = mTable[hash % mTableSize];
+        const auto index = hash % mTableSize;
+        std::lock_guard<std::mutex> lock(mMutexes[index % NUM_STRIPES]);
+        auto &item = mTable[index];
         item.Hash = hash;
         item.Score = score;
         item.Depth = depth;
@@ -194,4 +205,5 @@ private:
 
     uint64_t mTableSize;
     std::vector<TTEntry> mTable;
+    std::array<std::mutex, NUM_STRIPES> mMutexes;
 };

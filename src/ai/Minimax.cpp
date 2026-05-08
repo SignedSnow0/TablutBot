@@ -7,23 +7,25 @@
 #include "utils/Logger.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <limits>
+#include <mutex>
 #include <stop_token>
 #include <vector>
 
 static constexpr int64_t TT_BEST_MOVE_BONUS = 10000000;
 
 struct SearchResult {
-    std::atomic<int64_t> value;
-    std::atomic<uint32_t> index;
-    std::atomic<uint32_t> finished;
+    int64_t value;
+    uint32_t index;
+    std::atomic<uint32_t> finished{0};
 
-    std::atomic<uint64_t> cached;
-    std::atomic<uint64_t> evaluated;
-    std::atomic<uint64_t> interrupted;
-    std::atomic<uint64_t> pruned;
+    std::atomic<uint64_t> cached{0};
+    std::atomic<uint64_t> evaluated{0};
+    std::atomic<uint64_t> interrupted{0};
+    std::atomic<uint64_t> pruned{0};
 };
 
 Minimax::Minimax(uint64_t timeout, uint32_t maxThreads, uint32_t depth)
@@ -44,7 +46,7 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
     best.value = isMax ? std::numeric_limits<int64_t>::min()
                        : std::numeric_limits<int64_t>::max();
     best.index = 0;
-    best.finished = 0;
+    std::mutex bestMutex;
 
     for (uint32_t i = 0; i < moves.size(); i++) {
         const auto [from, to] = moves[i];
@@ -68,29 +70,18 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
                 return;
             }
 
-            best.finished++;
+            best.finished.fetch_add(1, std::memory_order_relaxed);
 
+            std::lock_guard<std::mutex> lock(bestMutex);
             if (isMax) {
-                int64_t current = best.value.load();
-
-                while (
-                    result.value > current &&
-                    !best.value.compare_exchange_weak(current, result.value)) {
-                }
-
-                if (best.value.load() == result.value) {
-                    best.index.store(i);
+                if (result.value > best.value) {
+                    best.value = result.value;
+                    best.index = i;
                 }
             } else {
-                int64_t current = best.value.load();
-
-                while (
-                    result.value < current &&
-                    !best.value.compare_exchange_weak(current, result.value)) {
-                }
-
-                if (best.value.load() == result.value) {
-                    best.index.store(i);
+                if (result.value < best.value) {
+                    best.value = result.value;
+                    best.index = i;
                 }
             }
         });
@@ -113,9 +104,9 @@ int64_t Minimax::Solve(const Tablut &initialState, bool isMax) {
              "cached, {} pruned, {} interrupted",
              best.finished.load(), moves.size(), best.evaluated.load(),
              best.cached.load(), best.pruned.load(), best.interrupted.load());
-    mBestMove = moves[best.index.load()];
+    mBestMove = moves[best.index];
 
-    return best.value.load();
+    return best.value;
 }
 
 Minimax::SearchData Minimax::Solve(const Tablut &state, uint32_t depth,
