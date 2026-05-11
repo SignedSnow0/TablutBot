@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
         Logger::Shutdown();
         return 1;
     }
-    std::string player(argv[1]);
-    bool isWhite = player == "WHITE" || player == "white";
+    std::string player(toLower(argv[1]));
+    bool isWhite = player == "white";
 
     if (isWhite) {
         Logger::Init("logs/white.log");
