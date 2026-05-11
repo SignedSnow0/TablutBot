@@ -1,6 +1,7 @@
 #include "Socket.h"
 #include "utils/Logger.h"
 #include <cstdint>
+#include <cstdio>
 #include <string>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -70,5 +71,7 @@ void Socket::Send(const std::string &msg) const {
     if (write(mSocket, msg.data(), msg.size()) != msg.size()) {
         LOG_ERROR("Failed to write to socket");
     }
+
+    printf("Sent %s", msg.c_str());
 }
 #endif
