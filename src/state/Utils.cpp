@@ -46,14 +46,8 @@ bool positionInLeftCamp(uint8_t row, uint8_t column) {
 
 bool IsInSameCamp(uint8_t pieceRow, uint8_t pieceColumn, uint8_t newRow,
                   uint8_t newColumn) {
-    if (!positionInTopCamp(newRow, newColumn) &&
-        !positionInRightCamp(newRow, newColumn) &&
-        !positionInBottomCamp(newRow, newColumn) &&
-        !positionInLeftCamp(newRow, newColumn)) {
+    if (!PositionInCamp(newRow, newColumn)) {
         return true;
-    }
-    if (!PositionInCamp(pieceRow, pieceColumn)) {
-        return false;
     }
 
     if (positionInTopCamp(pieceRow, pieceColumn) &&

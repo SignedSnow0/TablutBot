@@ -30,12 +30,13 @@ int main(int argc, char **argv) {
 
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0]
-                  << " <role> <server_ip> <timeout (seconds)>" << std::endl;
+                  << " <role> <timeout (seconds)> <server_ip>" << std::endl;
 
         Logger::Shutdown();
         return 1;
     }
-    std::string player(toLower(argv[1]));
+    std::string player(argv[1]);
+    toLower(player);
     bool isWhite = player == "white";
 
     if (isWhite) {
@@ -44,18 +45,18 @@ int main(int argc, char **argv) {
         Logger::Init("logs/black.log");
     }
 
-    auto solver = Minimax(std::max(atoi(argv[3]) * 1000 - 500, 1000),
+    auto solver = Minimax(std::max(atoi(argv[2]) * 1000 - 500, 1000),
                           NUM_THREADS, MAX_DEPTH);
 
     std::shared_ptr<Socket> socket;
     if (isWhite) {
-        socket = Socket::Connect(argv[2], WHITE_PORT);
+        socket = Socket::Connect(argv[3], WHITE_PORT);
         socket->Send(BOT_NAME_WHITE);
     } else {
-        socket = Socket::Connect(argv[2], BLACK_PORT);
+        socket = Socket::Connect(argv[3], BLACK_PORT);
         socket->Send(BOT_NAME_BLACK);
     }
-    LOG_INFO("Connected to {}:{} with name {}", argv[2],
+    LOG_INFO("Connected to {}:{} with name {}", argv[3],
              isWhite ? WHITE_PORT : BLACK_PORT,
              isWhite ? BOT_NAME_WHITE : BOT_NAME_BLACK);
 
@@ -78,7 +79,8 @@ int main(int argc, char **argv) {
             moveIndex++;
 
             received = reader.ReceiveTable();
-            solver.RegisterState(received.first, received.second == Turn::White);
+            solver.RegisterState(received.first,
+                                 received.second == Turn::White);
             // LOG_INFO("Table at move {} (black to move)\n{}", moveIndex,
             //          PrintTable(solver.CurrentState()));
 
@@ -98,7 +100,8 @@ int main(int argc, char **argv) {
 
             // Receive Move
             received = reader.ReceiveTable();
-            solver.RegisterState(received.first, received.second == Turn::White);
+            solver.RegisterState(received.first,
+                                 received.second == Turn::White);
             turn = received.second;
             if (turn != Turn::White) {
                 if (turn == Turn::Draw) {
@@ -121,7 +124,8 @@ int main(int argc, char **argv) {
         while (true) {
             // Receive move
             received = reader.ReceiveTable();
-            solver.RegisterState(received.first, received.second == Turn::White);
+            solver.RegisterState(received.first,
+                                 received.second == Turn::White);
             auto turn = received.second;
             if (turn != Turn::Black) {
                 if (turn == Turn::Draw) {
@@ -151,7 +155,8 @@ int main(int argc, char **argv) {
             moveIndex++;
 
             received = reader.ReceiveTable();
-            solver.RegisterState(received.first, received.second == Turn::White);
+            solver.RegisterState(received.first,
+                                 received.second == Turn::White);
             turn = received.second;
             // LOG_INFO("Table at move {} (white to move)\n{}", moveIndex,
             //          PrintTable(solver.CurrentState()));

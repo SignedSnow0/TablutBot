@@ -4,6 +4,12 @@ project(TablutBot)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
+option(USE_LOGS "Enables the logger system" ON)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+endif()
+
 add_executable(TablutBot
     src/ai/Evaluations.cpp
     src/ai/Heuristic.cpp
@@ -23,7 +29,6 @@ add_executable(TablutBot
     src/main.cpp    
 )
 
-option(USE_LOGS "Enables the logger system" ON)
 
 if(USE_LOGS)
     message(STATUS "Compiling with logs")

@@ -37,10 +37,10 @@ fi
 
 sleep 1
 
-./bin/TablutBot WHITE localhost $TIMEOUT &
+./bin/TablutBot WHITE $TIMEOUT localhost &
 WHITE_PID=$!
 
-./bin/TablutBot BLACK localhost $TIMEOUT &
+./bin/TablutBot BLACK $TIMEOUT localhost &
 BLACK_PID=$!
 
 trap kill_bots SIGINT
