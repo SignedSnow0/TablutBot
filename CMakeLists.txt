@@ -33,6 +33,9 @@ else()
     message(STATUS "Excluding logs")
 endif()
 
+find_package(Threads REQUIRED)
+target_link_libraries(TablutBot PRIVATE Threads::Threads)
+
 target_include_directories(TablutBot PRIVATE src/ lib/json/include)
 
 add_subdirectory(lib/json)
