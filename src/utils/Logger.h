@@ -1,9 +1,10 @@
 #pragma once
-#include <format>
 #include <fstream>
 #include <string>
 
 #ifndef NO_LOG
+#include <format>
+
 /*
  * Macro used to log a message with DEBUG level.
  *
